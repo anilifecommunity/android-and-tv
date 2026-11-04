@@ -20,6 +20,7 @@ local.properties
 keystore.properties
 nostr-update-key.properties
 scripts/.venv/
+.env.infrastructure.local
 
 # Local/editor state
 .idea/

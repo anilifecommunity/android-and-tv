@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible problem in Anilife on Android or TV.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: checkboxes
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed account tokens, cookies, private URLs, and personal data from logs or screenshots.
+          required: true
+  - type: dropdown
+    id: form
+    attributes:
+      label: Form factor
+      options: [Phone or tablet, Android TV or Google TV, Fire TV]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Anilife version and build number
+      placeholder: 0.1.0-beta.1 (1)
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android or Fire OS version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: Tell us exactly what you did and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Attach only a report you explicitly generated and reviewed in Anilife.
+

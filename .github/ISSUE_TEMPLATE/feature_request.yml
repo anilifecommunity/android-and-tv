@@ -1,0 +1,27 @@
+name: Feature request
+description: Propose a focused improvement that preserves Android 5.1 and TV support.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the user need rather than only a preferred implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
+  - type: checkboxes
+    id: parity
+    attributes:
+      label: Compatibility
+      options:
+        - label: I considered phone/tablet behaviour.
+        - label: I considered remote-only TV behaviour.
+        - label: I considered Android 5.1 / Fire OS 5 support.
+
