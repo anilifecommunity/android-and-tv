@@ -21,10 +21,10 @@ class AnnouncementTest {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     /**
-     * The real 0.1.54 update manifest, live-signed, lifted from `NostrManifestVerificationTest`.
-     * Its signature is genuine — the only thing wrong with it here is its d-tag.
+     * The Anilife update fixture, signed locally during the key ceremony and lifted from
+     * `NostrManifestVerificationTest`. Its signature is genuine; only its d-tag is wrong here.
      */
-    private val liveUpdateEventJson = """{"content":"{\"version\":\"0.1.54\",\"changelog\":\"Grouped downloads by series, pinned caption appearance preview, robust stream resolution fallback for embeds & HLS, and cold-start recovery.\",\"apkUrl\":\"https://github.com/OWNER/Anilili/releases/latest/download/Anilili.apk\",\"sizeBytes\":15022786}","created_at":1785533738,"id":"5a06c71dc1b40ae21b0b32b9f958627c0f305b55c6b44fd639454b209e95933d","kind":30078,"pubkey":"f1abd1ac685aed1f5145271283cd9418bf13aa92ed26399df191ae0c08b22207","sig":"fe9c7200df30a27345f55c3f6485be84a565bbf4b9c68231c1eb378ec48fd77c9631513c144931b832d0dd75a54bc99b70ffb322adbb6dc24f8d7cfa1110b94e","tags":[["d","anilili-update"]]}"""
+    private val liveUpdateEventJson = """{"id":"c62f6d32e23173c63d44ad9ed9af342b51380a0fc1ff060f69e3ef61a015a9ad","pubkey":"dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c","created_at":1793736000,"kind":30078,"tags":[["d","anilife-update"]],"content":"{\"version\":\"0.1.0-beta.1\",\"versionCode\":1,\"changelog\":\"Initial Anilife signed update channel fixture.\",\"apkUrl\":\"https://github.com/anilifecommunity/android-and-tv/releases/latest/download/Anilife.apk\",\"sizeBytes\":15022786}","sig":"27dd371cb1e60a5fa078203a61e195073bd0a4277e535bf3b72013ab3b6b8fb3a882b94fb66f99fee197f6aeb468f623cb30ffe6c98c7c9859113ceb3a7cc3cf"}"""
 
     /**
      * The d-tag is the whole separation between the two channels, since they share a key and a
@@ -53,7 +53,7 @@ class AnnouncementTest {
      * shares a key with spent an entire release silently rejecting every event, because the
      * verifier could not run at all and a `runCatching` turned that into "not genuine".
      */
-    private val liveAnnouncementEventJson = """{"id":"1a3e007da72179bb5cae37be96c334c06b58e1c9670541a9bf528a823e705d65","pubkey":"f1abd1ac685aed1f5145271283cd9418bf13aa92ed26399df191ae0c08b22207","created_at":1788559744,"kind":30078,"tags":[["d","anilili-announcement"]],"content":"{\"id\":\"test-signing-loop\",\"title\":\"Sources are down\",\"message\":\"Not your device - the provider is having an outage.\",\"url\":\"https://example.test/status\",\"urlLabel\":\"Status page\",\"severity\":\"emergency\",\"maxVersion\":\"0.1.99\"}","sig":"701f8435a36433c0543abd0c9dc1889c954b91b3691cee7f7d2e5493f6c37c3264ea29714a0ad71b4d36b32ce4bf4b1102a4c18f08fa177638beb8cbf8b694d9"}"""
+    private val liveAnnouncementEventJson = """{"id":"e6c0e7e297be878cec5465bf373452c1392ba96ae018a160ad79fa91cbfebc79","pubkey":"dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c","created_at":1793736001,"kind":30078,"tags":[["d","anilife-announcement"]],"content":"{\"id\":\"anilife-signing-loop\",\"title\":\"Anilife status\",\"message\":\"Signed Anilife announcement fixture.\",\"url\":\"https://github.com/anilifecommunity/android-and-tv\",\"urlLabel\":\"Project status\",\"severity\":\"emergency\",\"maxVersion\":\"0.1.99\"}","sig":"808f4cd5445240f2ba82824dc6eb85df84aa17a52b5c5b30375b4c4c476884ba925293f393ad3195e4a9d69558fe265bf76b3b299648ed77b61ba03adcb881cc"}"""
 
     @Test
     fun `an event the publish script signed passes the app's verification and parses`() {
@@ -68,10 +68,10 @@ class AnnouncementTest {
             ),
         )
         val parsed = parseAnnouncement(json, event.content)
-        assertEquals("test-signing-loop", parsed?.id)
-        assertEquals("Sources are down", parsed?.title)
+        assertEquals("anilife-signing-loop", parsed?.id)
+        assertEquals("Anilife status", parsed?.title)
         assertTrue("--emergency must reach the loud channel", parsed?.urgent == true)
-        assertEquals("example.test", parsed?.urlHost)
+        assertEquals("github.com", parsed?.urlHost)
         assertTrue(announcementApplies(parsed!!, "0.1.76", nowSec = 1_788_600_000L))
     }
 
@@ -111,7 +111,7 @@ class AnnouncementTest {
     fun `severity defaults to not urgent`() {
         val parsed = parseAnnouncement(json, """{"id":"a","message":"Just so you know"}""")
         assertFalse(parsed?.urgent == true)
-        assertEquals("Anilili", parsed?.title)
+        assertEquals("Anilife", parsed?.title)
     }
 
     /**

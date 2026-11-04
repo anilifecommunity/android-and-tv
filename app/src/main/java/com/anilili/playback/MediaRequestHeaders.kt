@@ -37,7 +37,7 @@ internal fun mediaRequestHeaders(
             put("Sec-Fetch-Dest", "empty")
             put("Sec-Fetch-Mode", "cors")
             put("Sec-Fetch-Site", "same-site")
-            put("X-Requested-With", "com.miruronative")
+            put("X-Requested-With", "io.github.anilifecommunity.anilife")
         }
         // Provider-supplied values win over defaults derived from the referer.
         putAll(extraHeaders)

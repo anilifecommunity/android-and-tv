@@ -47,7 +47,7 @@ import java.util.zip.ZipOutputStream
 /** Local-first, structured diagnostics for sideloaded phones and Android/Fire TV devices. */
 object DiagnosticsLog {
     private const val LOG_DIR = "diagnostics"
-    private const val SHARE_FILE_PREFIX = "Anilili-diagnostics"
+    private const val SHARE_FILE_PREFIX = "Anilife-diagnostics"
     private const val CACHED_REPORT_MAX_AGE_MS = 24L * 60 * 60 * 1_000
     private const val EVENT_FILE_BYTES = 1_000_000L
     private const val MAX_EXIT_TRACE_BYTES = 1_500_000L
@@ -728,7 +728,7 @@ object DiagnosticsLog {
         eventCount: Int,
         work: String,
     ): String = buildString {
-        appendLine("Anilili diagnostics")
+        appendLine("Anilife diagnostics")
         appendLine("Generated: ${manifest.generatedUtc}")
         appendLine("App: ${manifest.appVersion} (${manifest.versionCode}) ${manifest.buildType}")
         appendLine("Build: ${manifest.buildSha}")

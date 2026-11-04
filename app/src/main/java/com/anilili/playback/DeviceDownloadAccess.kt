@@ -8,7 +8,7 @@ import android.os.Environment
 import androidx.core.content.ContextCompat
 import java.io.File
 
-/** Android-version-specific access rules for the public Downloads/Anilili folder. */
+/** Android-version-specific access rules for the public Downloads/Anilife folder. */
 object DeviceDownloadAccess {
     /** The app's minimum API is 22, so every supported device has a public Downloads folder. */
     val isSupported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1

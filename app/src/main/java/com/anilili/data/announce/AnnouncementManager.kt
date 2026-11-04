@@ -64,7 +64,7 @@ object AnnouncementManager {
     private const val KEY_LIVE = "live_announcement"
 
     /** Intent extra naming the announcement to open. Value is [Announcement.id]. */
-    const val EXTRA_ANNOUNCEMENT_ID = "com.miruronative.extra.ANNOUNCEMENT_ID"
+    const val EXTRA_ANNOUNCEMENT_ID = "io.github.anilifecommunity.anilife.extra.ANNOUNCEMENT_ID"
 
     /**
      * The announcement a viewer has asked to read, or null when no dialog is open.

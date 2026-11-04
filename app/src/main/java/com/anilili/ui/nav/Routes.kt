@@ -4,7 +4,7 @@ import android.net.Uri
 
 /** Central route table + typed builders so call sites don't hand-format paths. */
 object Routes {
-    const val EXTRA_ROUTE = "com.miruronative.extra.ROUTE"
+    const val EXTRA_ROUTE = "io.github.anilifecommunity.anilife.extra.ROUTE"
     const val HOME = "home"
     const val SEARCH = "search"
     const val SEARCH_DESTINATION = "$SEARCH?studioId={studioId}&studioName={studioName}&genre={genre}&query={query}"

@@ -17,14 +17,30 @@ val diagnosticBuildSha = providers.environmentVariable("GITHUB_SHA").orNull
             isIgnoreExitValue = true
         }.standardOutput.asText.get().trim()
     }.getOrDefault("unknown").ifBlank { "unknown" }
-val appVersionCode = 96
-val appVersionName = "0.1.84"
-val openSubtitlesApiKey = providers.gradleProperty("openSubtitlesApiKey").orNull
-    ?: providers.environmentVariable("OPEN_SUBTITLES_API_KEY").orNull
-    ?: ""
-val tmdbReadToken = providers.gradleProperty("tmdbReadToken").orNull
-    ?: providers.environmentVariable("TMDB_READ_TOKEN").orNull
-    ?: ""
+val appVersionCode = 1
+val appVersionName = "0.1.0-beta.1"
+
+val infrastructureProperties = Properties().apply {
+    val file = rootProject.file(".env.infrastructure.local")
+    if (file.exists()) file.inputStream().use(::load)
+}
+
+fun infrastructureValue(environmentName: String, gradleName: String): String =
+    providers.gradleProperty(gradleName).orNull
+        ?: providers.environmentVariable(environmentName).orNull
+        ?: infrastructureProperties.getProperty(environmentName)
+        ?: ""
+
+fun buildConfigString(value: String): String =
+    "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val anilistClientId = infrastructureValue("ANILIST_CLIENT_ID", "anilistClientId")
+val malClientId = infrastructureValue("MAL_CLIENT_ID", "malClientId")
+val simklClientId = infrastructureValue("SIMKL_CLIENT_ID", "simklClientId")
+val discordApplicationId = infrastructureValue("DISCORD_APPLICATION_ID", "discordApplicationId")
+val openSubtitlesApiKey = infrastructureValue("OPEN_SUBTITLES_API_KEY", "openSubtitlesApiKey")
+val kartoonsAccountTokens = infrastructureValue("KARTOONS_ACCOUNT_TOKENS", "kartoonsAccountTokens")
+val kartoonsTokensMirrorUrl = infrastructureValue("KARTOONS_TOKENS_MIRROR_URL", "kartoonsTokensMirrorUrl")
 
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("keystore.properties")
@@ -37,20 +53,26 @@ android {
     buildToolsVersion = "35.0.1"
 
     defaultConfig {
-        applicationId = "com.miruronative"
+        applicationId = "io.github.anilifecommunity.anilife"
         // Fire OS 5 devices (including the 1st/2nd-gen Fire TV Sticks) report API 22.
         minSdk = 22
         targetSdk = 36
         versionCode = appVersionCode
         versionName = appVersionName
-        buildConfigField("String", "GIT_SHA", "\"$diagnosticBuildSha\"")
+        buildConfigField("String", "GIT_SHA", buildConfigString(diagnosticBuildSha))
+        buildConfigField("String", "ANILIST_CLIENT_ID", buildConfigString(anilistClientId))
+        buildConfigField("String", "MAL_CLIENT_ID", buildConfigString(malClientId))
+        buildConfigField("String", "SIMKL_CLIENT_ID", buildConfigString(simklClientId))
+        buildConfigField("String", "DISCORD_APPLICATION_ID", buildConfigString(discordApplicationId))
+        buildConfigField("String", "KARTOONS_ACCOUNT_TOKENS", buildConfigString(kartoonsAccountTokens))
+        buildConfigField("String", "KARTOONS_TOKENS_MIRROR_URL", buildConfigString(kartoonsTokensMirrorUrl))
         // Register a free API consumer at opensubtitles.com and provide its key through the
         // private Gradle user properties or OPEN_SUBTITLES_API_KEY. Never put it in this repo.
-        buildConfigField("String", "OPEN_SUBTITLES_API_KEY", "\"$openSubtitlesApiKey\"")
-        // TMDB v4 read token, for the episode stills the Konoha CDN has not caught up with.
-        // Same rule as above: private Gradle user properties or TMDB_READ_TOKEN, never this repo.
-        // Absent, the app simply keeps whatever episode art Konoha supplied.
-        buildConfigField("String", "TMDB_READ_TOKEN", "\"$tmdbReadToken\"")
+        buildConfigField("String", "OPEN_SUBTITLES_API_KEY", buildConfigString(openSubtitlesApiKey))
+        manifestPlaceholders["discordRedirectScheme"] = discordApplicationId
+            .takeIf(String::isNotBlank)
+            ?.let { "discord-$it" }
+            ?: "anilife-discord-unconfigured"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -73,7 +95,7 @@ android {
             //
             // Debug builds carry the debug signing key and release builds the real one, and
             // Android will not replace an installed app with one signed by a different key. Were
-            // both to share com.miruronative, putting a test build on a device that already has
+            // both to share the release application id, putting a test build on a device that already has
             // the release would mean uninstalling it first — taking the LibraryStore history,
             // watchlist, downloads and saved tokens with it.
             //
@@ -144,6 +166,13 @@ android {
             isReturnDefaultValues = true
         }
     }
+    lint {
+        // The inherited codebase has a large audited lint backlog. Keep it visible in the
+        // baseline while making every newly introduced finding fail CI.
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        checkReleaseBuilds = true
+    }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
     }
@@ -165,8 +194,8 @@ android {
             val abi = output.getFilter(OutputFile.ABI)
             val buildTypeSuffix = if (buildType.name == "release") "" else "-${buildType.name}"
             // Updaters in v0.1.32 and earlier install the release's first .apk asset, and
-            // GitHub orders assets by name: '.' sorts before '_', so "Anilili.apk" (universal,
-            // runs on every ABI) must precede "Anilili_<abi>.apk". Never name splits with '-';
+            // GitHub orders assets by name: '.' sorts before '_', so "Anilife.apk" (universal,
+            // runs on every ABI) must precede "Anilife_<abi>.apk". Never name splits with '-';
             // '-' sorts before '.' and legacy TVs would fetch an incompatible split.
             //
             // The mobile flavor keeps the historical names exactly, because every install out
@@ -175,9 +204,9 @@ android {
             // universal mobile APK rather than a build meant for a different form factor.
             val formSuffix = if (flavorName == "tv") "_tv" else ""
             output.outputFileName = if (abi == null) {
-                "Anilili$buildTypeSuffix$formSuffix.apk"
+                "Anilife$buildTypeSuffix$formSuffix.apk"
             } else {
-                "Anilili$buildTypeSuffix${formSuffix}_$abi.apk"
+                "Anilife$buildTypeSuffix${formSuffix}_$abi.apk"
             }
         }
     }

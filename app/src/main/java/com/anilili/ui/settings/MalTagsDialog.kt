@@ -31,7 +31,7 @@ internal fun MalTagsDialog(onDismiss: () -> Unit) {
             MidnightModalTitle(
                 kicker = "MyAnimeList",
                 title = "Tags shown as lists",
-                body = "MyAnimeList has no custom lists, so Anilili shows your tags as lists instead. " +
+                body = "MyAnimeList has no custom lists, so Anilife shows your tags as lists instead. " +
                     "Untick a tag to keep it off My List — it stays on MyAnimeList untouched.",
             )
         },

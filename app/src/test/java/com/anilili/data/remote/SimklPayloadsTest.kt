@@ -96,11 +96,11 @@ class SimklPayloadsTest {
 
     @Test
     fun `the sign-in callback is recognised with or without its answer`() {
-        assertTrue(isSimklRedirect("anilili://auth/simkl?code=abc&state=xyz&iss=https%3A%2F%2Fsimkl.com"))
-        assertTrue(isSimklRedirect("anilili://auth/simkl"))
-        assertTrue(isSimklRedirect("ANILILI://auth/simkl/?error=access_denied"))
-        assertFalse(isSimklRedirect("anilili://anime/21"))
-        assertFalse(isSimklRedirect("anilili://auth/simklx?code=1"))
-        assertFalse(isSimklRedirect("https://simkl.com/oauth2/authorize?redirect_uri=anilili://auth/simkl"))
+        assertTrue(isSimklRedirect("anilife://auth/simkl?code=abc&state=xyz&iss=https%3A%2F%2Fsimkl.com"))
+        assertTrue(isSimklRedirect("anilife://auth/simkl"))
+        assertTrue(isSimklRedirect("ANILIFE://auth/simkl/?error=access_denied"))
+        assertFalse(isSimklRedirect("anilife://anime/21"))
+        assertFalse(isSimklRedirect("anilife://auth/simklx?code=1"))
+        assertFalse(isSimklRedirect("https://simkl.com/oauth2/authorize?redirect_uri=anilife://auth/simkl"))
     }
 }

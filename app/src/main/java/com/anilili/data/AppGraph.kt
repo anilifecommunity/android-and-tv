@@ -119,7 +119,7 @@ object AppGraph {
             client = httpClient,
             json = json,
             apiKey = BuildConfig.OPEN_SUBTITLES_API_KEY,
-            userAgent = "Anilili v${BuildConfig.VERSION_NAME}",
+            userAgent = "Anilife v${BuildConfig.VERSION_NAME}",
         )
 
         val aniList = AniListClient(httpClient, json).also { this.aniList = it }
@@ -130,7 +130,9 @@ object AppGraph {
         DubIndex.refresh(context, konoha)
         com.anilili.data.recs.Recommendations.attach(context, httpClient, konoha)
         repository = MiruroRepository(
-            tmdb = TmdbClient(httpClient, json, cache, BuildConfig.TMDB_READ_TOKEN),
+            // TMDB credentials belong to the server-side Media Index job and must never ship in
+            // a recoverable APK. The static index remains available; live TMDB fallback is off.
+            tmdb = TmdbClient(httpClient, json, cache, readToken = ""),
             aniList = aniList,
             pipe = PipeClient(json, MiruroEmbedResolver(httpClient, json)),
             anivexa = AnivexaClient(context, httpClient, json, aniList, cache, konoha),

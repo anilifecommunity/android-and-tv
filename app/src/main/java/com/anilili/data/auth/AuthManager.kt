@@ -3,6 +3,7 @@ package com.anilili.data.auth
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import com.anilili.BuildConfig
 import java.security.SecureRandom
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,7 +22,7 @@ import kotlinx.serialization.json.intOrNull
  * secret is stored in the app. Tokens are long-lived (~1 year; AniList has no refresh).
  */
 object AuthManager {
-    const val CLIENT_ID = "45552"
+    val CLIENT_ID: String get() = BuildConfig.ANILIST_CLIENT_ID
     const val REDIRECT = "http://localhost"
     private const val AUTHORIZE_ENDPOINT = "https://anilist.co/api/v2/oauth/authorize"
 
@@ -47,9 +48,11 @@ object AuthManager {
     }
 
     val isLoggedIn: Boolean get() = current() != null
+    val isConfigured: Boolean get() = CLIENT_ID.isNotBlank()
     fun viewerId(): Int? = current()?.let(::jwtSubject)
 
     fun authorizeUrl(): String {
+        check(isConfigured) { "AniList is not configured for this Anilife build." }
         val state = ByteArray(24).also(SecureRandom()::nextBytes)
             .let { Base64.encodeToString(it, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING) }
         pendingOAuthState = state
@@ -106,12 +109,15 @@ object AuthManager {
      * The caller owns [state]. The local login keeps its own in `pendingOAuthState`, and a pairing
      * must not overwrite it — cancelling one would otherwise invalidate the other.
      */
-    fun pairingAuthorizeUrl(state: String): String = Uri.parse(AUTHORIZE_ENDPOINT).buildUpon()
-        .appendQueryParameter("client_id", CLIENT_ID)
-        .appendQueryParameter("response_type", "token")
-        .appendQueryParameter("state", state)
-        .build()
-        .toString()
+    fun pairingAuthorizeUrl(state: String): String {
+        check(isConfigured) { "AniList is not configured for this Anilife build." }
+        return Uri.parse(AUTHORIZE_ENDPOINT).buildUpon()
+            .appendQueryParameter("client_id", CLIENT_ID)
+            .appendQueryParameter("response_type", "token")
+            .appendQueryParameter("state", state)
+            .build()
+            .toString()
+    }
 
     /** The token from a pairing redirect. Never stored here — it belongs to the television. */
     fun extractPairingToken(url: String, state: String): String? = tokenFrom(url, state)

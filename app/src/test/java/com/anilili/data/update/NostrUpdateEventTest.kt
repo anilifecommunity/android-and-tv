@@ -18,13 +18,13 @@ class NostrUpdateEventTest {
 
     private val fixtureJson = """
         {
-          "id": "61ddae93a60885d570184110cf84502678c54d0ea84d319c911abb482dfdd82b",
-          "pubkey": "f1abd1ac685aed1f5145271283cd9418bf13aa92ed26399df191ae0c08b22207",
-          "created_at": 1754000000,
+          "id": "c62f6d32e23173c63d44ad9ed9af342b51380a0fc1ff060f69e3ef61a015a9ad",
+          "pubkey": "dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c",
+          "created_at": 1793736000,
           "kind": 30078,
-          "tags": [["d", "anilili-update"]],
-          "content": "{\"version\":\"0.1.54\",\"changelog\":\"Fixture release for unit tests\",\"apkUrl\":\"https://example.com/Anilili.apk\",\"sizeBytes\":12345}",
-          "sig": "b0e84789a9862b50e814a1e43a4b8bff34ac2bbb9e5ce0faeb8b06076bcdb41ebbb5e306ee86eac01acb653324bde0c325b90268f6130cd83a403655b3fded94"
+          "tags": [["d", "anilife-update"]],
+          "content": "{\"version\":\"0.1.0-beta.1\",\"versionCode\":1,\"changelog\":\"Initial Anilife signed update channel fixture.\",\"apkUrl\":\"https://github.com/anilifecommunity/android-and-tv/releases/latest/download/Anilife.apk\",\"sizeBytes\":15022786}",
+          "sig": "27dd371cb1e60a5fa078203a61e195073bd0a4277e535bf3b72013ab3b6b8fb3a882b94fb66f99fee197f6aeb468f623cb30ffe6c98c7c9859113ceb3a7cc3cf"
         }
     """.trimIndent()
 
@@ -34,7 +34,7 @@ class NostrUpdateEventTest {
     @Test
     fun eventIdMatchesNip01Serialization() {
         assertEquals(
-            "61ddae93a60885d570184110cf84502678c54d0ea84d319c911abb482dfdd82b",
+            "c62f6d32e23173c63d44ad9ed9af342b51380a0fc1ff060f69e3ef61a015a9ad",
             fixture().computeEventIdHex(),
         )
     }
@@ -46,7 +46,7 @@ class NostrUpdateEventTest {
 
     @Test
     fun tamperedContentIsRejected() {
-        val tampered = fixture().copy(content = fixture().content.replace("0.1.54", "9.9.9"))
+        val tampered = fixture().copy(content = fixture().content.replace("0.1.0-beta.1", "9.9.9"))
         assertFalse(tampered.isValidManifest())
     }
 
@@ -76,10 +76,10 @@ class NostrUpdateEventTest {
     @Test
     fun manifestParsesIntoUpdateInfo() {
         val info = fixture().parseManifest(json)
-        assertEquals("0.1.54", info.version)
-        assertEquals("Fixture release for unit tests", info.changelog)
-        assertEquals("https://example.com/Anilili.apk", info.apkUrl)
-        assertEquals(12345L, info.sizeBytes)
+        assertEquals("0.1.0", info.version)
+        assertEquals("Initial Anilife signed update channel fixture.", info.changelog)
+        assertEquals("https://github.com/anilifecommunity/android-and-tv/releases/latest/download/Anilife.apk", info.apkUrl)
+        assertEquals(15022786L, info.sizeBytes)
     }
 
     @Test

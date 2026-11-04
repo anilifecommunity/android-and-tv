@@ -14,7 +14,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.resume
 
-internal const val PAIRING_SERVICE_TYPE = "_anilili._tcp."
+internal const val PAIRING_SERVICE_TYPE = "_anilife._tcp."
 
 /** Advertised so a phone can tell one television from another before either shows a code. */
 internal const val PAIRING_TXT_VERSION = "v"
@@ -44,7 +44,7 @@ internal class PairingAdvertiser(context: Context) {
 
     fun register(port: Int, sessionId: String, services: Set<String>) {
         if (listener != null) return
-        val requestedName = "Anilili on ${android.os.Build.MODEL.orEmpty().ifBlank { "this TV" }}"
+        val requestedName = "Anilife on ${android.os.Build.MODEL.orEmpty().ifBlank { "this TV" }}"
         val info = NsdServiceInfo().apply {
             serviceName = requestedName
             serviceType = PAIRING_SERVICE_TYPE
@@ -141,7 +141,7 @@ internal class PairingBrowser(
         }
 
         multicastLock = runCatching {
-            wifi?.createMulticastLock("anilili-pairing")?.apply {
+            wifi?.createMulticastLock("anilife-pairing")?.apply {
                 setReferenceCounted(false)
                 acquire()
             }

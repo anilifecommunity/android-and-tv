@@ -1300,7 +1300,7 @@ object EpisodeDownloads {
             .ifBlank { "Episode" }
 
     /**
-     * Each series gets its own folder under Downloads/Anilili. A long-runner otherwise buries
+     * Each series gets its own folder under Downloads/Anilife. A long-runner otherwise buries
      * everything else in the same flat list, and the file manager has no way to group them.
      */
     internal fun deviceSeriesFolder(metadata: EpisodeDownloadMetadata): String =
@@ -1378,7 +1378,7 @@ object EpisodeDownloads {
     private const val BATCH_NOTIFICATION_ID = 7_400
     private const val DOWNLOAD_DIRECTORY = "episode-downloads"
     private const val SUBTITLE_DIRECTORY = "episode-download-subtitles"
-    internal const val PUBLIC_DOWNLOAD_SUBDIRECTORY = "Anilili"
+    internal const val PUBLIC_DOWNLOAD_SUBDIRECTORY = "Anilife"
     private const val PROGRESS_REFRESH_MS = 1_000L
     private const val USER_PAUSED_STOP_REASON = 1
     internal const val SYSTEM_TIMEOUT_STOP_REASON = 2

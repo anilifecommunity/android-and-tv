@@ -75,14 +75,14 @@ object ProviderBenchmark {
         if (BuildConfig.DEBUG) pinnedProvider?.takeIf { it.isNotBlank() } else null
 
     /** Intent extra carrying the provider to pin, honoured only by debug builds. */
-    const val EXTRA_PIN = "com.miruronative.extra.BENCH_PROVIDER"
+    const val EXTRA_PIN = "io.github.anilifecommunity.anilife.extra.BENCH_PROVIDER"
 
     /** Intent extra carrying [catalogTtlMs], honoured only by debug builds. */
-    const val EXTRA_CATALOG_TTL = "com.miruronative.extra.BENCH_CATALOG_TTL_MS"
+    const val EXTRA_CATALOG_TTL = "io.github.anilifecommunity.anilife.extra.BENCH_CATALOG_TTL_MS"
 
     /** Intent extra setting [dnsSinkhole] as comma-separated suffixes; empty clears it. */
-    const val EXTRA_DNS_SINKHOLE = "com.miruronative.extra.BENCH_DNS_SINKHOLE"
+    const val EXTRA_DNS_SINKHOLE = "io.github.anilifecommunity.anilife.extra.BENCH_DNS_SINKHOLE"
 
     /** Intent extra setting [forceCatalogRefresh], honoured only by debug builds. */
-    const val EXTRA_CATALOG_REFRESH = "com.miruronative.extra.BENCH_CATALOG_REFRESH"
+    const val EXTRA_CATALOG_REFRESH = "io.github.anilifecommunity.anilife.extra.BENCH_CATALOG_REFRESH"
 }

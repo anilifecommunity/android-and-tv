@@ -411,7 +411,7 @@ enum class AnililiError(
     // ---------------------------------------------------------------- BAK
     BACKUP_FILE_UNREADABLE(ErrorDomain.BACKUP, 1, "Couldn't read that file.", ErrorAction.CHOOSE_FILE),
     BACKUP_FILE_UNWRITABLE(ErrorDomain.BACKUP, 2, "Couldn't write the export file.", ErrorAction.RETRY, retryable = true),
-    BACKUP_NOT_A_BACKUP(ErrorDomain.BACKUP, 3, "That isn't an Anilili backup.", ErrorAction.CHOOSE_FILE),
+    BACKUP_NOT_A_BACKUP(ErrorDomain.BACKUP, 3, "That isn't an Anilife backup.", ErrorAction.CHOOSE_FILE),
     BACKUP_NOT_A_MAL_EXPORT(ErrorDomain.BACKUP, 4, "That isn't a MyAnimeList export file.", ErrorAction.CHOOSE_FILE),
     BACKUP_EMPTY(ErrorDomain.BACKUP, 5, "No anime entries in that file.", ErrorAction.CHOOSE_FILE),
     BACKUP_NOTHING_TO_EXPORT(ErrorDomain.BACKUP, 6, "Nothing here can be exported."),
@@ -442,7 +442,7 @@ enum class AnililiError(
     DIAGNOSTICS_WRITE_FAILED(ErrorDomain.DIAGNOSTICS, 3, "Couldn't record diagnostics on this device."),
 
     // ---------------------------------------------------------------- DLINK
-    LINK_UNKNOWN(ErrorDomain.LINK, 1, "That Anilili link isn't one this app understands."),
+    LINK_UNKNOWN(ErrorDomain.LINK, 1, "That Anilife link isn't one this app understands."),
 
     // ---------------------------------------------------------------- APP
     UNEXPECTED(ErrorDomain.APP, 1, "Something went wrong.", ErrorAction.SEND_DIAGNOSTICS),

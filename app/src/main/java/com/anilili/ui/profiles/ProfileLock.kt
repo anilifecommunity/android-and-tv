@@ -292,7 +292,7 @@ internal fun PinGate(
         GateStage.MASTER_CODE -> PinPad(
             title = "Reset ${profile.name}'s PIN",
             body = "Enter the ${Profiles.MASTER_CODE_LENGTH}-digit master code. " +
-                "If you don't have it, ask on the Anilili Discord server.",
+                "If you don't have it, contact the Anilife project maintainers.",
             error = error,
             avatar = { ProfileAvatar(profile, size = 96.dp) },
             length = Profiles.MASTER_CODE_LENGTH,

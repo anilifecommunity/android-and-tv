@@ -891,7 +891,7 @@ private fun ProfileHero(
         Column(Modifier.fillMaxWidth().padding(20.dp)) {
             Text("Your anime, in one place", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Black)
             Text(
-                "Connect AniList or MyAnimeList to browse every list, score, and episode progress from Anilili.",
+                "Connect AniList or MyAnimeList to browse every list, score, and episode progress from Anilife.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 5.dp),

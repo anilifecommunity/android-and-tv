@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish the Anilili update manifest to Nostr (kind 30078, d-tag "anilili-update").
+"""Publish the Anilife update manifest to Nostr (kind 30078, d-tag "anilife-update").
 
 This is the kill-proof update channel: the app checks GitHub Releases first and
 falls back to this signed Nostr manifest when GitHub is unreachable or the repo is
@@ -32,6 +32,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -42,22 +43,25 @@ except ImportError:
     sys.exit("Missing dependency: pip install -r scripts/requirements.txt (use scripts/.venv)")
 
 KIND = 30078
-D_TAG = "anilili-update"
+D_TAG = "anilife-update"
 # Same key, same kind, different d-tag: relays keep the newest event per (pubkey, kind,
 # d-tag), so the announcement replaces itself without ever touching the manifest beside it.
-ANNOUNCE_D_TAG = "anilili-announcement"
+ANNOUNCE_D_TAG = "anilife-announcement"
 RELAYS = [
     "wss://relay.damus.io",
     "wss://nos.lol",
     "wss://relay.nostr.band",
     "wss://relay.primal.net",
 ]
-KEY_FILE = Path(__file__).resolve().parent.parent / "nostr-update-key.properties"
+KEY_FILE = Path(
+    os.environ.get(
+        "NOSTR_UPDATE_KEY_FILE",
+        Path(__file__).resolve().parent.parent / "nostr-update-key.properties",
+    )
+).expanduser().resolve()
 
 
 def load_secret_hex() -> str:
-    import os
-
     env = os.environ.get("NOSTR_UPDATE_SECRET")
     if env:
         return env.strip()
@@ -273,7 +277,7 @@ def cmd_announce_fetch(_args: argparse.Namespace) -> None:
         sys.exit(f"publicKeyHex not found in {KEY_FILE}")
     request = json.dumps([
         "REQ",
-        "anilili-announcement-check",
+        "anilife-announcement-check",
         {"kinds": [KIND], "authors": [pubkey], "#d": [ANNOUNCE_D_TAG], "limit": 3},
     ])
     events: list[dict] = []
@@ -292,7 +296,7 @@ def cmd_fetch(_args: argparse.Namespace) -> None:
         sys.exit(f"publicKeyHex not found in {KEY_FILE}")
     request = json.dumps([
         "REQ",
-        "anilili-update-check",
+        "anilife-update-check",
         {"kinds": [KIND], "authors": [pubkey], "#d": [D_TAG], "limit": 3},
     ])
     events: list[dict] = []
@@ -362,7 +366,7 @@ def main() -> None:
         default=None,
         help="the build's versionCode; lets a same-version rebuild reach installs that have the version",
     )
-    publish.add_argument("--tv-apk-url", default=None, help="direct download URL of the Android TV APK (Anilili_tv.apk)")
+    publish.add_argument("--tv-apk-url", default=None, help="direct download URL of the Android TV APK (Anilife_tv.apk)")
     publish.add_argument("--tv-size-bytes", type=int, default=None, help="TV APK size; used only for progress display")
     publish.add_argument(
         "--apk-mirror",

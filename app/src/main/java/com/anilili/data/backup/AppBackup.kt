@@ -251,7 +251,7 @@ object AppBackup {
         val document = runCatching { json.decodeFromString(BackupDocument.serializer(), text) }
             .getOrElse { error ->
                 AnililiError.BACKUP_NOT_A_BACKUP.raise(
-                    detail = "The chosen file is not the JSON an Anilili backup is written as.",
+                    detail = "The chosen file is not the JSON an Anilife backup is written as.",
                     cause = error,
                 )
             }
@@ -262,7 +262,7 @@ object AppBackup {
         }
         if (document.version > VERSION) {
             AnililiError.BACKUP_NOT_A_BACKUP.raise(
-                detail = "That backup was written by a newer version of Anilili " +
+                detail = "That backup was written by a newer version of Anilife " +
                     "(format v${document.version}). Update the app, then restore it.",
             )
         }
@@ -270,5 +270,5 @@ object AppBackup {
     }
 
     fun fileName(date: LocalDate = LocalDate.now()): String =
-        "Anilili-backup-${date.format(DateTimeFormatter.BASIC_ISO_DATE)}.json"
+        "Anilife-backup-${date.format(DateTimeFormatter.BASIC_ISO_DATE)}.json"
 }

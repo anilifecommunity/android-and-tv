@@ -99,7 +99,7 @@ internal object BackupCrypto {
      * — so the message names the likely cause rather than the cryptographic one.
      */
     fun open(passphrase: String, sealed: SealedCredentials, associatedData: ByteArray): String {
-        if (sealed.kdf != KDF) error("These logins were sealed by a newer version of Anilili.")
+        if (sealed.kdf != KDF) error("These logins were sealed by a newer version of Anilife.")
         val salt = sealed.salt.decodeBase64()?.toByteArray()
             ?: error("The logins in that backup are damaged.")
         val iv = sealed.iv.decodeBase64()?.toByteArray()

@@ -156,7 +156,6 @@ class MiruroApp : Application(), ImageLoaderFactory {
         // After SettingsStore, whose switch the check consults before it fetches anything.
         diagnosticsStep("AnnouncementManager.init") { AnnouncementManager.init(this) }
         diagnosticsStep("AnnouncementScheduler.schedule") { AnnouncementScheduler.schedule(this) }
-        diagnosticsStep("UsagePing.init") { com.anilili.data.usage.UsagePing.init(this) }
         // The launcher icon follows the accent, but only switches once the app is out of sight:
         // some launchers redraw or drop the icon when its entry moves (AppIcon).
         diagnosticsStep("AppIcon observer") {

@@ -990,10 +990,10 @@ private fun WatchContent(
                                 ?.withCode()
                                 ?: AnililiError.DOWNLOAD_START_FAILED.report().withCode()
                             exportsToDevice && effectiveDestination.includesApp ->
-                                "Episode added to Anilili. The MP4 is written to Downloads once it finishes."
+                                "Episode added to Anilife. The MP4 is written to Downloads once it finishes."
                             exportsToDevice ->
                                 "Downloading now. The MP4 is written to Downloads once it finishes."
-                            else -> "Episode added to Anilili downloads."
+                            else -> "Episode added to Anilife downloads."
                         }
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                     }
@@ -1003,7 +1003,7 @@ private fun WatchContent(
                             "Saving this episode to Downloads as MP4."
                         exportsToDevice ->
                             "Already downloading. The MP4 follows once it finishes."
-                        effectiveDestination.includesApp -> "This episode is already in Anilili downloads."
+                        effectiveDestination.includesApp -> "This episode is already in Anilife downloads."
                         else -> AnililiError.DOWNLOAD_START_FAILED.report().withCode()
                     }
                     Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -2161,7 +2161,7 @@ private fun EpisodeDownloadDialog(
                 )
             }
         } else {
-            MidnightInlineNotice("This source can only be kept in the Anilili offline library.")
+            MidnightInlineNotice("This source can only be kept in the Anilife offline library.")
         }
 
         if (remainingCount > 0 || fillerCount > 0) {

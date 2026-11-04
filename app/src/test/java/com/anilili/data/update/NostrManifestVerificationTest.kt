@@ -8,10 +8,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Verifies the Nostr fallback against a real, live-signed manifest event.
+ * Verifies the Nostr fallback against a real manifest signed by the Anilife release key.
  *
- * The event below was captured from wss://nos.lol on 2026-08-01 — the actual 0.1.54 release
- * manifest, with its real BIP-340 signature. It exercises the whole chain the app runs:
+ * The event below is a local, non-published fixture made during the Anilife key ceremony. It has
+ * a real BIP-340 signature and exercises the whole chain the app runs:
  * NIP-01 id re-serialization, the d-tag check, and the secp256k1 Schnorr verification.
  *
  * This is the test that would have caught the release being silently broken: R8 had shrunk the
@@ -22,7 +22,7 @@ import org.junit.Test
 class NostrManifestVerificationTest {
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val liveEventJson = """{"content":"{\"version\":\"0.1.54\",\"changelog\":\"Grouped downloads by series, pinned caption appearance preview, robust stream resolution fallback for embeds & HLS, and cold-start recovery.\",\"apkUrl\":\"https://github.com/OWNER/Anilili/releases/latest/download/Anilili.apk\",\"sizeBytes\":15022786}","created_at":1785533738,"id":"5a06c71dc1b40ae21b0b32b9f958627c0f305b55c6b44fd639454b209e95933d","kind":30078,"pubkey":"f1abd1ac685aed1f5145271283cd9418bf13aa92ed26399df191ae0c08b22207","sig":"fe9c7200df30a27345f55c3f6485be84a565bbf4b9c68231c1eb378ec48fd77c9631513c144931b832d0dd75a54bc99b70ffb322adbb6dc24f8d7cfa1110b94e","tags":[["d","anilili-update"]]}"""
+    private val liveEventJson = """{"id":"c62f6d32e23173c63d44ad9ed9af342b51380a0fc1ff060f69e3ef61a015a9ad","pubkey":"dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c","created_at":1793736000,"kind":30078,"tags":[["d","anilife-update"]],"content":"{\"version\":\"0.1.0-beta.1\",\"versionCode\":1,\"changelog\":\"Initial Anilife signed update channel fixture.\",\"apkUrl\":\"https://github.com/anilifecommunity/android-and-tv/releases/latest/download/Anilife.apk\",\"sizeBytes\":15022786}","sig":"27dd371cb1e60a5fa078203a61e195073bd0a4277e535bf3b72013ab3b6b8fb3a882b94fb66f99fee197f6aeb468f623cb30ffe6c98c7c9859113ceb3a7cc3cf"}"""
 
     private fun event() = json.parseToJsonElement(liveEventJson).jsonObject.toNostrEvent()
 
@@ -40,7 +40,7 @@ class NostrManifestVerificationTest {
     @Test
     fun `the manifest parses into an installable update`() {
         val info = event().parseManifest(json)
-        assertEquals("0.1.54", info.version)
+        assertEquals("0.1.0", info.version)
         assertTrue("apk must be fetched over TLS", info.apkUrl.startsWith("https://"))
         assertTrue("size should be populated", info.sizeBytes > 0)
     }
@@ -49,36 +49,36 @@ class NostrManifestVerificationTest {
     @Test
     fun `a legacy manifest still gives a TV something to install`() {
         val info = event().parseManifest(json, isTv = true)
-        assertEquals("0.1.54", info.version)
-        assertTrue("falls back to the single apkUrl", info.apkUrl.endsWith("Anilili.apk"))
+        assertEquals("0.1.0", info.version)
+        assertTrue("falls back to the single apkUrl", info.apkUrl.endsWith("Anilife.apk"))
     }
 
     @Test
     fun `each form factor takes its own variant when the manifest offers them`() {
         val withVariants = event().copy(
             content = """
-                {"version":"0.1.56","apkUrl":"https://example.test/Anilili.apk","sizeBytes":11,
+                {"version":"0.1.56","apkUrl":"https://example.test/Anilife.apk","sizeBytes":11,
                  "variants":{
-                   "mobile":{"url":"https://example.test/Anilili.apk","sizeBytes":11},
-                   "tv":{"url":"https://example.test/Anilili_tv.apk","sizeBytes":22}}}
+                   "mobile":{"url":"https://example.test/Anilife.apk","sizeBytes":11},
+                   "tv":{"url":"https://example.test/Anilife_tv.apk","sizeBytes":22}}}
             """.trimIndent(),
         )
         val tv = withVariants.parseManifest(json, isTv = true)
-        assertEquals("https://example.test/Anilili_tv.apk", tv.apkUrl)
+        assertEquals("https://example.test/Anilife_tv.apk", tv.apkUrl)
         assertEquals(22L, tv.sizeBytes)
 
         val phone = withVariants.parseManifest(json, isTv = false)
-        assertEquals("https://example.test/Anilili.apk", phone.apkUrl)
+        assertEquals("https://example.test/Anilife.apk", phone.apkUrl)
         assertEquals(11L, phone.sizeBytes)
     }
 
     @Test
     fun `the build number is read when published and absent otherwise`() {
-        assertEquals(null, event().parseManifest(json).build)
+        assertEquals(1, event().parseManifest(json).build)
         val withBuild = event().copy(
             content = """
-                {"version":"0.1.80","versionCode":82,"apkUrl":"https://example.test/Anilili.apk",
-                 "variants":{"tv":{"url":"https://example.test/Anilili_tv.apk","versionCode":83}}}
+                {"version":"0.1.80","versionCode":82,"apkUrl":"https://example.test/Anilife.apk",
+                 "variants":{"tv":{"url":"https://example.test/Anilife_tv.apk","versionCode":83}}}
             """.trimIndent(),
         )
         assertEquals(82, withBuild.parseManifest(json, isTv = false).build)
@@ -90,12 +90,12 @@ class NostrManifestVerificationTest {
     fun `a manifest with only a mobile variant does not strand a TV`() {
         val mobileOnly = event().copy(
             content = """
-                {"version":"0.1.56","apkUrl":"https://example.test/Anilili.apk",
-                 "variants":{"mobile":{"url":"https://example.test/Anilili.apk"}}}
+                {"version":"0.1.56","apkUrl":"https://example.test/Anilife.apk",
+                 "variants":{"mobile":{"url":"https://example.test/Anilife.apk"}}}
             """.trimIndent(),
         )
         assertEquals(
-            "https://example.test/Anilili.apk",
+            "https://example.test/Anilife.apk",
             mobileOnly.parseManifest(json, isTv = true).apkUrl,
         )
     }
@@ -103,7 +103,7 @@ class NostrManifestVerificationTest {
     @Test
     fun `a tampered manifest is rejected`() {
         // Same signature, different content: the id no longer matches, so it must not be trusted.
-        val forged = event().copy(content = event().content.replace("0.1.54", "9.9.9"))
+        val forged = event().copy(content = event().content.replace("0.1.0-beta.1", "9.9.9"))
         assertFalse("content tampering must fail verification", forged.isValidManifest())
     }
 

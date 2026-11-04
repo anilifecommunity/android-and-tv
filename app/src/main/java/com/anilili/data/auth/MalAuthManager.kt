@@ -3,6 +3,7 @@ package com.anilili.data.auth
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import com.anilili.BuildConfig
 import com.anilili.diagnostics.DiagnosticsLog
 import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +34,7 @@ internal data class MalTokens(
  * refresh, so [freshAccessToken] must be used before each API call.
  */
 object MalAuthManager {
-    const val CLIENT_ID = "4ae5f8056db821737a4f40f8816177cd"
+    val CLIENT_ID: String get() = BuildConfig.MAL_CLIENT_ID
     private const val AUTHORIZE_ENDPOINT = "https://myanimelist.net/v1/oauth2/authorize"
     private const val TOKEN_ENDPOINT = "https://myanimelist.net/v1/oauth2/token"
 
@@ -63,8 +64,10 @@ object MalAuthManager {
     }
 
     val isLoggedIn: Boolean get() = _tokens.value != null
+    val isConfigured: Boolean get() = CLIENT_ID.isNotBlank()
 
     fun authorizeUrl(): String {
+        check(isConfigured) { "MyAnimeList is not configured for this Anilife build." }
         val state = randomUrlSafe(24)
         // PKCE `plain`: the verifier IS the challenge. 32 random bytes → 43-char base64url,
         // inside MAL's required 43–128 length window.

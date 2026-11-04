@@ -1064,7 +1064,7 @@ internal enum class LoginLoadProblem(
     ),
     WEBVIEW_UNAVAILABLE(
         title = "Secure login isn't available on this device.",
-        guidance = "Install or enable Android System WebView, then restart Anilili and try again.",
+        guidance = "Install or enable Android System WebView, then restart Anilife and try again.",
     ),
 }
 

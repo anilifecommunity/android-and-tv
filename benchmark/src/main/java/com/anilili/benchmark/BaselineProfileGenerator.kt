@@ -25,7 +25,7 @@ class BaselineProfileGenerator {
         pressHome()
         startActivityAndWait()
         check(device.wait(Until.hasObject(By.pkg(TARGET_PACKAGE).depth(0)), APP_WAIT_MS)) {
-            "Anilili root window did not appear"
+            "Anilife root window did not appear"
         }
         device.waitForIdle()
 
@@ -61,10 +61,10 @@ class BaselineProfileGenerator {
     }
 }
 
-internal const val TARGET_PACKAGE = "com.miruronative"
+internal const val TARGET_PACKAGE = "io.github.anilifecommunity.anilife"
 internal const val APP_WAIT_MS = 15_000L
 
-private const val ROUTE_EXTRA = "com.miruronative.extra.ROUTE"
+private const val ROUTE_EXTRA = "io.github.anilifecommunity.anilife.extra.ROUTE"
 
 /** A long-finished series every source carries, so the journey does not depend on a new episode. */
 private const val PROFILE_TITLE_ROUTE = "detail/166873"

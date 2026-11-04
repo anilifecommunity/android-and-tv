@@ -23,6 +23,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "MiruroNative"
+rootProject.name = "Anilife"
 include(":app")
 include(":benchmark")

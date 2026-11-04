@@ -100,7 +100,7 @@ fun TvPairingScreen(
                 is TvPairingState.Waiting -> {
                     Heading("Sign in from your phone")
                     Body(
-                        "Open Anilili on your phone, go to your profile and choose " +
+                        "Open Anilife on your phone, go to your profile and choose " +
                             "\"Link a TV\". This television will appear in the list.",
                     )
                     if (current.addresses.isEmpty()) {

@@ -3,6 +3,7 @@ package com.anilili.data.discord
 import android.content.Context
 import android.net.Uri
 import android.util.Base64
+import com.anilili.BuildConfig
 import com.anilili.data.auth.SecureTokenStore
 import com.anilili.diagnostics.DiagnosticsLog
 import java.security.MessageDigest
@@ -84,7 +85,8 @@ object DiscordAuthManager {
      * sits in the authorize URL — so it lives here beside the AniList and MyAnimeList client ids
      * rather than in a private Gradle property.
      */
-    const val APPLICATION_ID = "1545324837306634250"
+    val APPLICATION_ID: String get() = BuildConfig.DISCORD_APPLICATION_ID
+    val isConfigured: Boolean get() = APPLICATION_ID.isNotBlank()
 
     private const val AUTHORIZE_ENDPOINT = "https://discord.com/oauth2/authorize"
     private const val TOKEN_ENDPOINT = "https://discord.com/api/v10/oauth2/token"
@@ -161,6 +163,7 @@ object DiscordAuthManager {
      * verifier lost that way would strand the viewer on a code that can never be exchanged.
      */
     fun authorizeUrl(redirect: DiscordRedirect): String {
+        check(isConfigured) { "Discord is not configured for this Anilife build." }
         val state = randomUrlSafe(24)
         val verifier = randomUrlSafe(48)
         pendingStore.save(

@@ -284,7 +284,7 @@ object UpdateManager {
                             // The instruction is the detail rather than the line, because the line
                             // has to fit a row and this one only makes sense in the dialog: there is
                             // no button the app can offer once its own settings intent has failed.
-                            detail = "Allow \"install unknown apps\" for Anilili in Android's settings, " +
+                            detail = "Allow \"install unknown apps\" for Anilife in Android's settings, " +
                                 "then try the update again.",
                             cause = error,
                             attributes = mapOf("version" to ready.update.version, "stage" to "permission_settings"),
@@ -357,7 +357,7 @@ object UpdateManager {
             )
         }
         dir.listFiles()?.forEach { it.delete() }
-        val file = File(dir, "Anilili-${info.version}.apk")
+        val file = File(dir, "Anilife-${info.version}.apk")
         // No call timeout: the release APK takes longer than the API client's 45s cap on slow links.
         val client = AppGraph.httpClient.newBuilder()
             .cache(null)
@@ -408,7 +408,7 @@ object UpdateManager {
                 .setDataAndType(uri, APK_MIME_TYPE)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (policy.uriKind == UpdateInstallerUriKind.FILE_PROVIDER) {
-                intent.clipData = ClipData.newRawUri("Anilili update", uri)
+                intent.clipData = ClipData.newRawUri("Anilife update", uri)
                 intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             try {
@@ -579,28 +579,28 @@ internal fun compareAppVersions(remote: String, installed: String): Int {
 
 /** TV builds publish assets carrying this segment; every other asset belongs to the phone build. */
 private const val TV_ASSET_MARKER = "_tv"
+private val ANILIFE_APK_NAME = Regex(
+    "^Anilife(?:_tv)?(?:_(?:arm64-v8a|armeabi-v7a))?\\.apk$",
+    RegexOption.IGNORE_CASE,
+)
 
 /**
  * Chooses the smallest compatible split while retaining the universal APK as a safe fallback.
  *
- * Since the mobile/TV flavor split there are two families of asset in one release. A TV install
- * must not update itself into the phone build (it would drag Cast and its Play Services
- * dependency back onto a device whose Play Services cannot serve them), and a phone must never
- * take a TV asset. Releases that predate the split carry no TV assets at all, so a TV device
- * falls back to the phone family rather than refusing to update.
+ * Anilife is a fresh install identity, so historical publisher names and cross-form-factor
+ * fallbacks are deliberately rejected. A TV install must never update itself into the phone build,
+ * and a phone must never take a TV asset.
  */
 internal fun preferredReleaseApkName(
     names: List<String>,
     supportedAbis: List<String>,
     isTv: Boolean = false,
 ): String? {
-    val apks = names.filter { it.endsWith(".apk", ignoreCase = true) }
+    val apks = names.filter(ANILIFE_APK_NAME::matches)
     if (apks.isEmpty()) return null
     val isTvAsset = { name: String -> name.contains(TV_ASSET_MARKER, ignoreCase = true) }
-    // Prefer this form factor's family; fall back to the other only when this one is absent.
-    val family = apks.filter { isTvAsset(it) == isTv }.ifEmpty {
-        if (isTv) apks.filterNot(isTvAsset) else return null
-    }
+    val family = apks.filter { isTvAsset(it) == isTv }
+    if (family.isEmpty()) return null
     val preferredAbi = when {
         supportedAbis.any { it.equals("arm64-v8a", ignoreCase = true) } -> "arm64-v8a"
         supportedAbis.any { it.equals("armeabi-v7a", ignoreCase = true) } -> "armeabi-v7a"
@@ -608,8 +608,7 @@ internal fun preferredReleaseApkName(
     }
     return preferredAbi?.let { abi ->
         family.firstOrNull { it.contains(abi, ignoreCase = true) }
-    } ?: family.firstOrNull { it.equals("Anilili.apk", ignoreCase = true) }
-        ?: family.firstOrNull { it.equals("Anilili_tv.apk", ignoreCase = true) }
-        ?: family.firstOrNull { it.contains("universal", ignoreCase = true) }
-        ?: family.first()
+    } ?: family.firstOrNull { it.equals("Anilife.apk", ignoreCase = true) }
+        ?: family.firstOrNull { it.equals("Anilife_tv.apk", ignoreCase = true) }
+        ?: return null
 }
