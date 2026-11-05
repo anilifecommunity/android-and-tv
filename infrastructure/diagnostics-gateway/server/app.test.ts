@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { zipSync, strToU8 } from "fflate";
 import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createApp } from "./app.js";
+import { createApp, temporaryUploadPath } from "./app.js";
 import type {
   CleanupResult,
   DailyUsage,
@@ -124,6 +124,14 @@ describe("diagnostic gateway", () => {
     const response = await request(app).get("/health");
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ status: "ok", storage: "private-hf-bucket" });
+  });
+
+  it("rejects temporary upload paths outside the configured directory", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "anilili-upload-path-"));
+    expect(temporaryUploadPath(directory, join(directory, "report.zip"))).toBe(join(directory, "report.zip"));
+    expect(() => temporaryUploadPath(directory, join(directory, "..", "outside.zip"))).toThrow(
+      "Invalid temporary upload path",
+    );
   });
 
   it("accepts the Android multipart contract and stores one report", async () => {

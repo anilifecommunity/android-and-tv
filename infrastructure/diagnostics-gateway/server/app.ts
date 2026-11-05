@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { readFile, unlink } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import cookieParser from "cookie-parser";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -35,6 +35,16 @@ const VALID_TRIGGERS = new Set<DiagnosticTrigger>(["manual", "crash", "slow_star
 interface AppDependencies {
   store: ReportStore;
   config: RuntimeConfig;
+}
+
+class ClientInputError extends Error {}
+class DailyCapacityError extends Error {}
+
+export function temporaryUploadPath(tempDirectory: string, path: string): string {
+  const root = resolve(tempDirectory);
+  const candidate = resolve(root, basename(path));
+  if (candidate !== resolve(path)) throw new ClientInputError("Invalid temporary upload path");
+  return candidate;
 }
 
 function utcDay(date = new Date()): string {
@@ -72,12 +82,16 @@ function descriptionField(body: Record<string, unknown>): string | undefined {
   return redacted || undefined;
 }
 
-async function validateScreenshot(file?: Express.Multer.File): Promise<ScreenshotUpload | null> {
+async function validateScreenshot(
+  tempDirectory: string,
+  file?: Express.Multer.File,
+): Promise<ScreenshotUpload | null> {
   if (!file) return null;
   if (file.size <= 0 || file.size > MAX_SCREENSHOT_BYTES) {
     throw new ClientInputError("Invalid diagnostic screenshot");
   }
-  const header = (await readFile(file.path)).subarray(0, 12);
+  const path = temporaryUploadPath(tempDirectory, file.path);
+  const header = (await readFile(path)).subarray(0, 12);
   const isJpeg = header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
   const isPng = header.length >= 8 &&
     [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a].every((byte, index) => header[index] === byte);
@@ -88,14 +102,16 @@ async function validateScreenshot(file?: Express.Multer.File): Promise<Screensho
   if (!contentType || file.mimetype !== contentType) {
     throw new ClientInputError("Diagnostic screenshot must be a JPEG, PNG or WebP image");
   }
-  return { path: file.path, bytes: file.size, contentType };
+  return { path, bytes: file.size, contentType };
 }
 
-class ClientInputError extends Error {}
-class DailyCapacityError extends Error {}
-
-async function removeTemporary(path?: string): Promise<void> {
-  if (path) await unlink(path).catch(() => undefined);
+async function removeTemporary(tempDirectory: string, path?: string): Promise<void> {
+  if (!path) return;
+  try {
+    await unlink(temporaryUploadPath(tempDirectory, path)).catch(() => undefined);
+  } catch {
+    // Multer paths outside its configured directory must never be deleted.
+  }
 }
 
 function logEvent(name: string, attributes: Record<string, unknown> = {}): void {
@@ -162,6 +178,7 @@ export function createApp({ store, config }: AppDependencies) {
     const screenshotTempPath = screenshotFile?.path;
     try {
       if (!reportFile || !tempPath) throw new ClientInputError("Diagnostic report is missing");
+      const safeTempPath = temporaryUploadPath(config.tempDirectory, tempPath);
       if (!new Set(["application/zip", "application/octet-stream"]).has(reportFile.mimetype)) {
         throw new ClientInputError("Diagnostic report must be a ZIP archive");
       }
@@ -174,17 +191,17 @@ export function createApp({ store, config }: AppDependencies) {
       const buildSha = metadataField(request.body, "build_sha");
       const platform = metadataField(request.body, "platform");
       const description = descriptionField(request.body);
-      const screenshot = await validateScreenshot(screenshotFile);
+      const screenshot = await validateScreenshot(config.tempDirectory, screenshotFile);
 
       if (await store.hasReport(reportId)) {
-        await removeTemporary(tempPath);
-        await removeTemporary(screenshotTempPath);
+        await removeTemporary(config.tempDirectory, tempPath);
+        await removeTemporary(config.tempDirectory, screenshotTempPath);
         response.json({ status: "accepted", reportId, receivedBytes: reportFile.size });
         return;
       }
 
       uploadRateLimiter.reserve(request.ip ?? request.socket.remoteAddress ?? "unknown");
-      const archiveDetails = await validateArchive(tempPath);
+      const archiveDetails = await validateArchive(safeTempPath);
       const validationMs = performance.now() - started;
       const usage = await store.dailyUsage(utcDay());
       if (
@@ -211,9 +228,9 @@ export function createApp({ store, config }: AppDependencies) {
         ...archiveDetails,
       };
       const storeStarted = performance.now();
-      await store.putReport(reportId, tempPath, screenshot, metadata);
-      await removeTemporary(tempPath);
-      await removeTemporary(screenshotTempPath);
+      await store.putReport(reportId, safeTempPath, screenshot, metadata);
+      await removeTemporary(config.tempDirectory, tempPath);
+      await removeTemporary(config.tempDirectory, screenshotTempPath);
       const retentionBefore = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
       await store.cleanup(retentionBefore, MAX_STORED_BYTES);
       const storeMs = performance.now() - storeStarted;
@@ -232,8 +249,8 @@ export function createApp({ store, config }: AppDependencies) {
       });
       response.json({ status: "accepted", reportId, receivedBytes: reportFile.size });
     } catch (error) {
-      await removeTemporary(tempPath);
-      await removeTemporary(screenshotTempPath);
+      await removeTemporary(config.tempDirectory, tempPath);
+      await removeTemporary(config.tempDirectory, screenshotTempPath);
       next(error);
     }
   });
