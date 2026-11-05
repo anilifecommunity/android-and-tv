@@ -22,12 +22,13 @@ enum class ThemeBackground(val storedValue: String, val label: String, val descr
 /**
  * The seed every colour in the scheme is generated from.
  *
- * [MONOCHROME] is the default and the app's long-standing look: white is the accent, which carries
- * further across a room than any hue and never clashes with the artwork behind it. [WALLPAPER] is
- * Material You — the seed the system extracted from the wallpaper — and only exists on Android 12+.
+ * [ANILIFE_GREEN] is the default shared with the logo and web client. [MONOCHROME] preserves the
+ * app's long-standing look as the Legacy Midnight preset. [WALLPAPER] is Material You: the seed
+ * the system extracted from the wallpaper, and only exists on Android 12+.
  * [CUSTOM] is whatever the viewer mixed in the custom colour dialog.
  */
 enum class ThemeAccent(val storedValue: String, val label: String, val seed: Long?) {
+    ANILIFE_GREEN("anilife_green", "Anilife green", 0xFF79D66C),
     MONOCHROME("monochrome", "Monochrome", null),
     WALLPAPER("wallpaper", "From wallpaper", null),
     /** The viewer's own colour, stored beside it as `theme_custom_seed`. */
@@ -44,7 +45,7 @@ enum class ThemeAccent(val storedValue: String, val label: String, val seed: Lon
 
     companion object {
         fun fromStored(value: String?): ThemeAccent =
-            entries.firstOrNull { it.storedValue == value } ?: MONOCHROME
+            entries.firstOrNull { it.storedValue == value } ?: ANILIFE_GREEN
     }
 }
 
@@ -100,7 +101,8 @@ enum class ThemePreset(
     val style: ThemeStyle,
     val contrast: ThemeContrast = ThemeContrast.STANDARD,
 ) {
-    MIDNIGHT("Midnight", ThemeBackground.AMOLED, ThemeAccent.MONOCHROME, ThemeStyle.VIVID),
+    ANILIFE("Anilife", ThemeBackground.AMOLED, ThemeAccent.ANILIFE_GREEN, ThemeStyle.VIVID),
+    MIDNIGHT("Legacy Midnight", ThemeBackground.AMOLED, ThemeAccent.MONOCHROME, ThemeStyle.VIVID),
     CRIMSON_NIGHT("Crimson Night", ThemeBackground.AMOLED, ThemeAccent.BLOOD_RED, ThemeStyle.VIVID),
     TOXIC("Toxic", ThemeBackground.AMOLED, ThemeAccent.NEON_GREEN, ThemeStyle.VIBRANT),
     ROYAL("Royal", ThemeBackground.AMOLED, ThemeAccent.PURPLE, ThemeStyle.VIVID),

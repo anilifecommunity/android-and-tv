@@ -76,7 +76,7 @@ class NostrUpdateEventTest {
     @Test
     fun manifestParsesIntoUpdateInfo() {
         val info = fixture().parseManifest(json)
-        assertEquals("0.1.0", info.version)
+        assertEquals("0.1.0-beta.1", info.version)
         assertEquals("Initial Anilife signed update channel fixture.", info.changelog)
         assertEquals("https://github.com/anilifecommunity/android-and-tv/releases/latest/download/Anilife.apk", info.apkUrl)
         assertEquals(15022786L, info.sizeBytes)
@@ -159,5 +159,40 @@ class NostrManifestMirrorTest {
             mirrors = listOf("https://primary/a.apk", "https://m1/a.apk"),
         )
         assertEquals(listOf("https://primary/a.apk", "https://m1/a.apk"), info.downloadUrls)
+    }
+
+    @Test
+    fun `canonical manifests enforce expiry checksum form factor and ABI`() {
+        val content = """
+            {"schema":1,"version":"0.2.0-beta.1","versionCode":2,"sequence":2,
+             "expiresAt":2000,"apkUrl":"https://primary/a.apk","sha256":"${"a".repeat(64)}",
+             "formFactor":"mobile","abis":["arm64-v8a"]}
+        """.trimIndent()
+        val info = manifest(content).parseManifest(
+            json,
+            supportedAbis = listOf("arm64-v8a"),
+            nowEpochSeconds = 1000,
+        )
+        assertEquals(2L, info.sequence)
+        assertEquals("a".repeat(64), info.sha256)
+
+        listOf(
+            content.replace("\"sequence\":2,", ""),
+            content.replace("\"expiresAt\":2000", "\"expiresAt\":999"),
+            content.replace("\"${"a".repeat(64)}\"", "\"bad\""),
+            content.replace("\"formFactor\":\"mobile\"", "\"formFactor\":\"tv\""),
+            content.replace("\"arm64-v8a\"", "\"x86\""),
+            content.replace("[\"arm64-v8a\"]", "[]"),
+        ).forEach { invalid ->
+            assertTrue(
+                runCatching {
+                    manifest(invalid).parseManifest(
+                        json,
+                        supportedAbis = listOf("arm64-v8a"),
+                        nowEpochSeconds = 1000,
+                    )
+                }.isFailure,
+            )
+        }
     }
 }

@@ -2613,9 +2613,9 @@ fun PlayerSurface(
         }
 
         if (controller == null) {
-            com.anilili.ui.components.WaterFillLogoIndicator(
+            androidx.compose.material3.CircularProgressIndicator(
                 modifier = Modifier.align(Alignment.Center),
-                size = 72.dp,
+                strokeWidth = 3.dp,
             )
         }
 

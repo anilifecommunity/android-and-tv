@@ -3,12 +3,15 @@ package com.anilili.data.update
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.anilili.BuildConfig
 import com.anilili.data.AppGraph
+import com.anilili.data.settings.SettingsStore
 import com.anilili.diagnostics.DiagnosticsLog
 import com.anilili.errors.AnililiError
 import com.anilili.errors.AnililiFailure
@@ -17,10 +20,13 @@ import com.anilili.errors.report
 import com.anilili.errors.toFailure
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -64,6 +70,16 @@ object UpdateManager {
          * See [promptsUnasked].
          */
         val important: Boolean = false,
+        /** SHA-256 of the selected APK, lowercase hexadecimal. */
+        val sha256: String? = null,
+        /** Monotonic signed-manifest sequence, used to reject replay after a newer manifest. */
+        val sequence: Long? = null,
+        /** Signed manifest expiry as Unix seconds. */
+        val expiresAtEpochSeconds: Long? = null,
+        /** `mobile` or `tv`, when declared by the canonical manifest schema. */
+        val formFactor: String? = null,
+        /** ABIs carried by the selected APK. */
+        val abis: List<String> = emptyList(),
     ) {
         /** Every place this APK can be fetched from, preferred first, without duplicates. */
         val downloadUrls: List<String> get() = (listOf(apkUrl) + mirrors).distinct()
@@ -88,6 +104,7 @@ object UpdateManager {
 
     private const val PREFS = "anilili_updates"
     private const val KEY_LAST_CHECK = "last_check_ms"
+    private const val KEY_LAST_SEQUENCE = "last_manifest_sequence"
     /**
      * The shortest gap between two automatic checks.
      *
@@ -180,14 +197,27 @@ object UpdateManager {
             )
             return
         }
-        DiagnosticsLog.event("Update check requested manual=$manual installed=$currentVersion")
+        val includeBeta = SettingsStore.receiveBetaUpdates.value
+        DiagnosticsLog.event(
+            "Update check requested manual=$manual installed=$currentVersion includeBeta=$includeBeta",
+        )
         _state.value = State.Checking
         val appContext = context.applicationContext
         scope.launch {
-            runCatching { fetchLatest() }
+            runCatching {
+                val info = fetchLatest(includeBeta)
+                val lastSequence = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getLong(KEY_LAST_SEQUENCE, -1L)
+                if (!acceptsManifestSequence(info.sequence, lastSequence)) {
+                    error("Update manifest sequence rolled back")
+                }
+                info
+            }
                 .onSuccess { info ->
-                    appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
+                    appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                        .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
+                        .apply { info.sequence?.let { putLong(KEY_LAST_SEQUENCE, it) } }
+                        .apply()
                     val offer = updateOffer(info.version, info.build, currentVersion, currentBuild)
                     _quietUpdate.value = info.takeIf { offer == UpdateOffer.QUIET }
                     _pendingUpdate.value = info.takeIf { offer != UpdateOffer.NONE }
@@ -323,16 +353,32 @@ object UpdateManager {
      * GitHub is no longer consulted. The release keeps its notes but carries no APK, so the call
      * could only ever fail, and asking it first is what made every check pay for a doomed request.
      */
-    private fun fetchLatest(): UpdateInfo =
-        runCatching { NostrUpdateSource.fetchManifestFromMirror(AppGraph.httpClient, json) }
-            .getOrElse { mirrorError ->
-                DiagnosticsLog.throwable("Manifest mirror failed; falling back to Nostr relays", mirrorError)
-                runCatching { NostrUpdateSource.fetchManifest(AppGraph.httpClient, json) }
-                    .getOrElse { nostrError ->
-                        DiagnosticsLog.throwable("Nostr relays also failed", nostrError)
-                        throw mirrorError
-                    }
-            }
+    private suspend fun fetchLatest(includeBeta: Boolean): UpdateInfo = coroutineScope {
+        val stable = async {
+            runCatching { NostrUpdateSource.fetchManifestFromMirror(AppGraph.httpClient, json) }
+                .recoverCatching { mirrorError ->
+                    DiagnosticsLog.throwable("Manifest mirror failed; falling back to Nostr relays", mirrorError)
+                    NostrUpdateSource.fetchManifest(AppGraph.httpClient, json)
+                }
+        }
+        if (!includeBeta) return@coroutineScope stable.await().getOrThrow()
+
+        val beta = async {
+            runCatching {
+                NostrUpdateSource.fetchManifest(
+                    AppGraph.httpClient,
+                    json,
+                    NostrUpdateSource.BETA_MANIFEST_D_TAG,
+                )
+            }.onFailure { DiagnosticsLog.throwable("Beta update check failed", it) }
+        }
+        val stableResult = stable.await()
+        val betaResult = beta.await()
+        newestUpdate(listOfNotNull(stableResult.getOrNull(), betaResult.getOrNull()))
+            ?: throw stableResult.exceptionOrNull()
+            ?: betaResult.exceptionOrNull()
+            ?: error("No update manifest was found")
+    }
 
     private fun downloadApk(context: Context, info: UpdateInfo): File {
         val policy = updateInstallerPolicy(Build.VERSION.SDK_INT)
@@ -367,6 +413,7 @@ object UpdateManager {
         for ((index, url) in info.downloadUrls.withIndex()) {
             try {
                 downloadFrom(client, url, file, info)
+                verifyDownloadedApk(context, file, info)
                 if (index > 0) DiagnosticsLog.event("Update downloaded from mirror #$index")
                 return file
             } catch (e: Exception) {
@@ -439,21 +486,66 @@ object UpdateManager {
             responseBody.byteStream().use { input ->
                 file.outputStream().use { output ->
                     val buffer = ByteArray(64 * 1024)
+                    val digest = MessageDigest.getInstance("SHA-256")
                     var written = 0L
                     while (true) {
                         val read = input.read(buffer)
                         if (read < 0) break
                         output.write(buffer, 0, read)
+                        digest.update(buffer, 0, read)
                         written += read
                         if (total > 0) {
                             _state.value = State.Downloading(info, (written.toFloat() / total).coerceIn(0f, 1f))
                         }
                     }
-                    if (total > 0 && written < total) error("Download incomplete ($written of $total bytes)")
+                    if (info.sizeBytes > 0 && written != info.sizeBytes) {
+                        error("Download size mismatch ($written of ${info.sizeBytes} bytes)")
+                    }
+                    val expectedSha256 = info.sha256
+                    if (expectedSha256 != null && digest.digest().toHexString() != expectedSha256) {
+                        error("Download checksum mismatch")
+                    }
                 }
             }
         }
         return file
+    }
+
+    @Suppress("DEPRECATION")
+    private fun verifyDownloadedApk(context: Context, file: File, info: UpdateInfo) {
+        val packageManager = context.packageManager
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+        val candidate = packageManager.getPackageArchiveInfo(file.path, flags)
+            ?: error("Downloaded file is not an APK")
+        val installed = packageManager.getPackageInfo(context.packageName, flags)
+        if (candidate.packageName != context.packageName) error("Downloaded APK package does not match Anilife")
+        info.build?.let { expected ->
+            val actual = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                candidate.longVersionCode
+            } else {
+                candidate.versionCode.toLong()
+            }
+            if (actual != expected.toLong()) error("Downloaded APK build does not match the manifest")
+        }
+        if (candidate.versionName != info.version) error("Downloaded APK version does not match the manifest")
+        if (!signersMatch(installed.signerBytes(installed = true), candidate.signerBytes(installed = false))) {
+            error("Downloaded APK signer does not match the installed app")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun PackageInfo.signerBytes(installed: Boolean): List<ByteArray> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val signing = signingInfo ?: return emptyList()
+            val signers = if (installed) signing.signingCertificateHistory else signing.apkContentsSigners
+            signers.orEmpty().map { it.toByteArray() }
+        } else {
+            signatures.orEmpty().map { it.toByteArray() }
+        }
     }
 
 }
@@ -492,7 +584,8 @@ private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
 
 /** Shared version extraction used by both the GitHub and Nostr update sources. */
 internal fun parseVersion(text: String): String? =
-    Regex.cached("""v?(\d+(?:\.\d+)+)""").find(text)?.groupValues?.get(1)
+    Regex.cached("""^v?(\d+(?:\.\d+)+(?:-[0-9A-Za-z.-]+)?)$""")
+        .matchEntire(text.trim())?.groupValues?.get(1)
 
 /**
  * Whether an automatic check may run now.
@@ -503,6 +596,22 @@ internal fun parseVersion(text: String): String? =
  */
 internal fun updateCheckIsDue(nowMs: Long, lastCheckMs: Long, floorMs: Long): Boolean =
     lastCheckMs <= 0L || nowMs < lastCheckMs || nowMs - lastCheckMs >= floorMs
+
+internal fun acceptsManifestSequence(sequence: Long?, lastAccepted: Long): Boolean =
+    sequence == null || lastAccepted < 0L || sequence >= lastAccepted
+
+internal fun signersMatch(installed: List<ByteArray>, candidate: List<ByteArray>): Boolean {
+    if (installed.isEmpty() || candidate.isEmpty()) return false
+    fun ByteArray.digest() = MessageDigest.getInstance("SHA-256").digest(this).toHexString()
+    val trusted = installed.map(ByteArray::digest).toSet()
+    return candidate.map(ByteArray::digest).any(trusted::contains)
+}
+
+internal fun newestUpdate(updates: List<UpdateManager.UpdateInfo>): UpdateManager.UpdateInfo? =
+    updates.maxWithOrNull { left, right ->
+        compareAppVersions(left.version, right.version).takeIf { it != 0 }
+            ?: (left.build ?: 0).compareTo(right.build ?: 0)
+    }
 
 /** "v0.1.80", or "v0.1.80 (build 82)" when the build number is what tells two apart. */
 internal fun versionLabel(version: String, build: Int?): String =
@@ -551,28 +660,46 @@ internal fun updateOffer(
 /**
  * Whether a check that nobody asked for pops the update up.
  *
- * A new version always does. A rebuild of the installed version normally waits in Settings, and on
- * a TV that means it waits forever: TVs are opened to watch, not to visit Settings, and on
- * 2026-10-22 only 18% of the TVs pinging in 30 days were on a build that sends the version 2 usage
- * ping, against 35% of phones. So the fixes reached the biggest audience last. A rebuild the
- * publisher marks important (`--important` in scripts/nostr_update.py, per form factor) pops up
- * like a release; the "Check for updates on launch" setting still decides whether anything pops up.
+ * A new version always does. A rebuild of the installed version normally waits in Settings, which
+ * is easy to miss on a remote-first device. A rebuild the publisher marks important (`--important`
+ * in scripts/nostr_update.py, per form factor) therefore pops up like a release; the "Check for
+ * updates on launch" setting still decides whether anything pops up.
  */
 internal fun promptsUnasked(offer: UpdateOffer, important: Boolean): Boolean =
     offer == UpdateOffer.PROMPT || (offer == UpdateOffer.QUIET && important)
 
 internal fun compareAppVersions(remote: String, installed: String): Int {
-    fun parts(version: String): List<Int> = version
-        .removePrefix("v")
-        .split('.')
-        .map { part -> part.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
-
-    val remoteParts = parts(remote)
-    val installedParts = parts(installed)
-    for (i in 0 until maxOf(remoteParts.size, installedParts.size)) {
-        val remotePart = remoteParts.getOrElse(i) { 0 }
-        val installedPart = installedParts.getOrElse(i) { 0 }
-        if (remotePart != installedPart) return remotePart.compareTo(installedPart)
+    fun parsed(version: String): Pair<List<Int>, List<String>> {
+        val split = version.removePrefix("v").removeSuffix("-debug").split('-', limit = 2)
+        return split[0].split('.').map { it.toIntOrNull() ?: 0 } to
+            split.getOrNull(1)?.split('.').orEmpty()
+    }
+    val (remoteCore, remotePre) = parsed(remote)
+    val (installedCore, installedPre) = parsed(installed)
+    for (index in 0 until maxOf(remoteCore.size, installedCore.size)) {
+        val diff = (remoteCore.getOrNull(index) ?: 0)
+            .compareTo(installedCore.getOrNull(index) ?: 0)
+        if (diff != 0) return diff
+    }
+    if (remotePre.isEmpty() || installedPre.isEmpty()) {
+        return when {
+            remotePre.isEmpty() && installedPre.isNotEmpty() -> 1
+            remotePre.isNotEmpty() && installedPre.isEmpty() -> -1
+            else -> 0
+        }
+    }
+    for (index in 0 until maxOf(remotePre.size, installedPre.size)) {
+        val left = remotePre.getOrNull(index) ?: return -1
+        val right = installedPre.getOrNull(index) ?: return 1
+        val leftNumber = left.toLongOrNull()
+        val rightNumber = right.toLongOrNull()
+        val diff = when {
+            leftNumber != null && rightNumber != null -> leftNumber.compareTo(rightNumber)
+            leftNumber != null -> -1
+            rightNumber != null -> 1
+            else -> left.compareTo(right, ignoreCase = true)
+        }
+        if (diff != 0) return diff
     }
     return 0
 }

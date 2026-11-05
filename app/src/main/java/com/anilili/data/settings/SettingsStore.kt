@@ -971,6 +971,9 @@ object SettingsStore {
     private val _updateCheckOnLaunch = MutableStateFlow(true)
     val updateCheckOnLaunch = _updateCheckOnLaunch.asStateFlow()
 
+    private val _receiveBetaUpdates = MutableStateFlow(false)
+    val receiveBetaUpdates = _receiveBetaUpdates.asStateFlow()
+
     /**
      * Pins the top bar and the bottom navigation on screen instead of letting a scroll tuck them
      * away. Off by default, which keeps the roomier YouTube-style behaviour; on for anyone who
@@ -992,10 +995,7 @@ object SettingsStore {
     private val _searchAsYouType = MutableStateFlow(true)
     val searchAsYouType = _searchAsYouType.asStateFlow()
 
-    /**
-     * TV flavor only: open on the video intro (`res/raw/launch_intro.mp4`, since v0.1.80). Off, the
-     * app opens on the water-fill mark it had before, the one the phone still uses.
-     */
+    /** Show the supplied Anilife startup animation on mobile and TV. */
     private val _videoLaunchIntro = MutableStateFlow(true)
     val videoLaunchIntro = _videoLaunchIntro.asStateFlow()
 
@@ -1105,7 +1105,7 @@ object SettingsStore {
      */
     private val _themeBackground = MutableStateFlow(ThemeBackground.AMOLED)
     val themeBackground = _themeBackground.asStateFlow()
-    private val _themeAccent = MutableStateFlow(ThemeAccent.MONOCHROME)
+    private val _themeAccent = MutableStateFlow(ThemeAccent.ANILIFE_GREEN)
     val themeAccent = _themeAccent.asStateFlow()
     private val _themeStyle = MutableStateFlow(ThemeStyle.VIVID)
     val themeStyle = _themeStyle.asStateFlow()
@@ -1396,6 +1396,7 @@ object SettingsStore {
     }
 
     fun setUpdateCheckOnLaunch(value: Boolean) = save(UPDATE_CHECK_ON_LAUNCH, value, _updateCheckOnLaunch)
+    fun setReceiveBetaUpdates(value: Boolean) = save(RECEIVE_BETA_UPDATES, value, _receiveBetaUpdates)
     fun setStaticAppChrome(value: Boolean) = save(STATIC_APP_CHROME, value, _staticAppChrome)
     fun setGlass(section: GlassSection, value: Boolean) =
         save(GLASS_KEYS.getValue(section), value, _glass.getValue(section))
@@ -1670,10 +1671,10 @@ object SettingsStore {
         }
     }
 
-    /** Puts the theme back to AMOLED black and monochrome, at Material's standard contrast. */
+    /** Puts the theme back to the shared Anilife black-and-green palette. */
     fun resetTheme() {
         _themeBackground.value = ThemeBackground.AMOLED
-        _themeAccent.value = ThemeAccent.MONOCHROME
+        _themeAccent.value = ThemeAccent.ANILIFE_GREEN
         _themeStyle.value = ThemeStyle.VIVID
         _themeContrast.value = ThemeContrast.STANDARD
         _playerAccent.value = false
@@ -2035,6 +2036,7 @@ object SettingsStore {
         _subtitleSignsWithDialogue.value = prefs[SUBTITLE_SIGNS_WITH_DIALOGUE] ?: true
         _subtitlesByDefault.value = prefs[SUBTITLES_BY_DEFAULT] ?: true
         _updateCheckOnLaunch.value = prefs[UPDATE_CHECK_ON_LAUNCH] ?: true
+        _receiveBetaUpdates.value = prefs[RECEIVE_BETA_UPDATES] ?: false
         _staticAppChrome.value = prefs[STATIC_APP_CHROME] ?: false
         GlassSection.entries.forEach { _glass.getValue(it).value = prefs[GLASS_KEYS.getValue(it)] ?: true }
         _searchAsYouType.value = prefs[SEARCH_AS_YOU_TYPE] ?: true
@@ -2198,6 +2200,7 @@ object SettingsStore {
     private val SUBTITLE_SIGNS_WITH_DIALOGUE = booleanPreferencesKey("subtitle_signs_with_dialogue")
     private val SUBTITLES_BY_DEFAULT = booleanPreferencesKey("subtitles_by_default")
     private val UPDATE_CHECK_ON_LAUNCH = booleanPreferencesKey("update_check_on_launch")
+    private val RECEIVE_BETA_UPDATES = booleanPreferencesKey("receive_beta_updates")
     private val STATIC_APP_CHROME = booleanPreferencesKey("static_app_chrome")
     private val GLASS_KEYS = GlassSection.entries.associateWith { booleanPreferencesKey("glass_${it.name.lowercase()}") }
     private val SEARCH_AS_YOU_TYPE = booleanPreferencesKey("search_as_you_type")
@@ -2288,6 +2291,7 @@ object SettingsStore {
         VIDEO_CACHE_SIZE,
         PLAYBACK_BUFFER_SIZE,
         UPDATE_CHECK_ON_LAUNCH,
+        RECEIVE_BETA_UPDATES,
         APP_ICON_MATCHES_THEME,
         // How much this box's picture overshoots this panel. Every profile watches the same screen.
         TV_OVERSCAN_PERCENT,
@@ -2326,6 +2330,7 @@ object SettingsStore {
         SUBTITLE_SIGNS_WITH_DIALOGUE,
         SUBTITLES_BY_DEFAULT,
         UPDATE_CHECK_ON_LAUNCH,
+        RECEIVE_BETA_UPDATES,
         STATIC_APP_CHROME,
         SEARCH_AS_YOU_TYPE,
         VIDEO_LAUNCH_INTRO,

@@ -31,7 +31,8 @@ import okhttp3.WebSocketListener
  * The latest release is published as a Nostr addressable event (kind 30078, d-tag
  * [MANIFEST_D_TAG]) signed by the project key in [MANIFEST_PUBKEY_HEX]; relays keep
  * only the newest event for that (pubkey, kind, d-tag) tuple. The event content is a
- * JSON manifest: {"version","changelog","apkUrl","sizeBytes"}. If GitHub is gone, a
+ * JSON manifest containing version, build, expiry, sequence, form-factor, ABI and checksum data.
+ * If GitHub is gone, a
  * new manifest pointing at any mirror is published with scripts/nostr_update.py and
  * every installed app follows it — the pubkey baked in here is the only "address"
  * the app ever needs.
@@ -49,6 +50,7 @@ object NostrUpdateSource {
     const val MANIFEST_MIRROR_URL =
         "https://github.com/anilifecommunity/android-and-tv/releases/latest/download/update.json"
     const val MANIFEST_D_TAG = "anilife-update"
+    const val BETA_MANIFEST_D_TAG = "anilife-update-beta"
 
     private val RELAYS = listOf(
         "wss://relay.damus.io",
@@ -85,12 +87,20 @@ object NostrUpdateSource {
         val event = json.parseToJsonElement(body).jsonObject.toNostrEvent()
         if (!event.isValidManifest()) error("Manifest mirror returned an event that failed verification")
         DiagnosticsLog.event("Update manifest read from mirror createdAt=${event.createdAt}")
-        return event.parseManifest(json, isTv = com.anilili.data.AppGraph.isTv)
+        return event.parseManifest(
+            json,
+            isTv = com.anilili.data.AppGraph.isTv,
+            supportedAbis = android.os.Build.SUPPORTED_ABIS.toList(),
+        )
     }
 
     /** Queries all relays in parallel and returns the newest validly signed manifest. */
-    fun fetchManifest(client: OkHttpClient, json: Json): UpdateManager.UpdateInfo {
-        val verified = scanRelays(client, json, MANIFEST_D_TAG, SUBSCRIPTION_ID)
+    fun fetchManifest(
+        client: OkHttpClient,
+        json: Json,
+        dTag: String = MANIFEST_D_TAG,
+    ): UpdateManager.UpdateInfo {
+        val verified = scanRelays(client, json, dTag, SUBSCRIPTION_ID)
         // UPD-02 rather than UPD-01: the relays answered and held nothing this app would accept,
         // which is a different thing from not reaching them — and worth telling apart, because two
         // of the four relays refuse most publishes and a manifest that reached none of them is a
@@ -99,7 +109,11 @@ object NostrUpdateSource {
             ?: AnililiError.UPDATE_NO_MANIFEST.raise(
                 detail = "No validly signed manifest was found on any relay.",
             )
-        return newest.parseManifest(json, isTv = com.anilili.data.AppGraph.isTv)
+        return newest.parseManifest(
+            json,
+            isTv = com.anilili.data.AppGraph.isTv,
+            supportedAbis = android.os.Build.SUPPORTED_ABIS.toList(),
+        )
     }
 
     /**
@@ -209,10 +223,10 @@ internal data class NostrEvent(
     val sig: String,
 ) {
     /** Full NIP-01 verification of the update manifest: shape, d-tag, id hash, Schnorr signature. */
-    fun isValidManifest(): Boolean = isValidSignedBy(
+    fun isValidManifest(expectedDTag: String = NostrUpdateSource.MANIFEST_D_TAG): Boolean = isValidSignedBy(
         NostrUpdateSource.MANIFEST_PUBKEY_HEX,
         NostrUpdateSource.MANIFEST_KIND,
-        NostrUpdateSource.MANIFEST_D_TAG,
+        expectedDTag,
     )
 
     /**
@@ -280,8 +294,15 @@ internal data class NostrEvent(
      * before the split) rather than leaving it stranded. Apps older than this simply ignore
      * `variants`, which is why the top-level fields stay put.
      */
-    fun parseManifest(json: Json, isTv: Boolean = false): UpdateManager.UpdateInfo {
+    fun parseManifest(
+        json: Json,
+        isTv: Boolean = false,
+        supportedAbis: List<String> = emptyList(),
+        nowEpochSeconds: Long = System.currentTimeMillis() / 1000,
+    ): UpdateManager.UpdateInfo {
         val manifest = json.parseToJsonElement(content).jsonObject
+        val schema = manifest["schema"]?.jsonPrimitive?.content?.toIntOrNull()
+        if (schema != null && schema != 1) error("Unsupported update manifest schema: $schema")
         val versionText = manifest["version"]?.jsonPrimitive?.content
             ?: error("Nostr update manifest is missing a version")
         val version = parseVersion(versionText)
@@ -294,6 +315,31 @@ internal data class NostrEvent(
         val sizeBytes = variant?.get("sizeBytes")?.jsonPrimitive?.content?.toLongOrNull()
             ?: manifest["sizeBytes"]?.jsonPrimitive?.content?.toLongOrNull()
             ?: -1L
+        val sha256 = (variant?.get("sha256") ?: manifest["sha256"])
+            ?.jsonPrimitive?.content?.lowercase()
+        val sequence = manifest["sequence"]?.jsonPrimitive?.content?.toLongOrNull()
+        val expiresAt = manifest["expiresAt"]?.jsonPrimitive?.content?.toLongOrNull()
+        val expectedForm = if (isTv) "tv" else "mobile"
+        val formFactor = (variant?.get("formFactor") ?: manifest["formFactor"])
+            ?.jsonPrimitive?.content
+        val abis = (variant?.get("abis") ?: manifest["abis"])
+            ?.let { it as? JsonArray }
+            ?.map { it.jsonPrimitive.content }
+            .orEmpty()
+        if (schema == 1) {
+            if (sequence == null || sequence <= 0) error("Update manifest sequence is missing or invalid")
+            if (expiresAt == null || expiresAt <= nowEpochSeconds) error("Update manifest has expired")
+            if (sha256 == null || !sha256.matches(Regex("^[a-f0-9]{64}$"))) {
+                error("Update manifest checksum is missing or invalid")
+            }
+            if (formFactor != expectedForm) error("Update manifest form factor does not match this app")
+            if (abis.isEmpty()) error("Update manifest ABI list is missing")
+            if (supportedAbis.isNotEmpty() && abis.none { declared ->
+                    supportedAbis.any { it.equals(declared, ignoreCase = true) }
+                }) {
+                error("Update manifest has no APK ABI supported by this device")
+            }
+        }
         DiagnosticsLog.event(
             "Nostr manifest selected version=$versionText tv=$isTv " +
                 "variant=${if (variant != null) (if (isTv) "tv" else "mobile") else "legacy-apkUrl"}",
@@ -322,6 +368,11 @@ internal data class NostrEvent(
             mirrors = mirrors,
             build = build,
             important = important,
+            sha256 = sha256,
+            sequence = sequence,
+            expiresAtEpochSeconds = expiresAt,
+            formFactor = formFactor,
+            abis = abis,
         )
     }
 }

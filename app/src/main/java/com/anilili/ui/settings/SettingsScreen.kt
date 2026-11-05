@@ -407,6 +407,7 @@ fun SettingsScreen(
     val subtitlesWithDub by SettingsStore.subtitlesWithDub.collectAsState()
     val subtitlesByDefault by SettingsStore.subtitlesByDefault.collectAsState()
     val updateCheckOnLaunch by SettingsStore.updateCheckOnLaunch.collectAsState()
+    val receiveBetaUpdates by SettingsStore.receiveBetaUpdates.collectAsState()
     val staticAppChrome by SettingsStore.staticAppChrome.collectAsState()
     val searchAsYouType by SettingsStore.searchAsYouType.collectAsState()
     val videoLaunchIntro by SettingsStore.videoLaunchIntro.collectAsState()
@@ -2940,16 +2941,13 @@ fun SettingsScreen(
                         onCheckedChange = SettingsStore::setSearchAsYouType,
                     )
                 }
-                // Keyed on the APK like the intro itself: only the TV flavor carries the video.
-                if (BuildConfig.FLAVOR == "tv") {
-                    item(key = "Video intro") {
-                        MidnightSettingSwitchRow(
-                            title = "Video intro",
-                            description = "Off: open on the water-fill logo instead",
-                            checked = videoLaunchIntro,
-                            onCheckedChange = SettingsStore::setVideoLaunchIntro,
-                        )
-                    }
+                item(key = "Startup animation") {
+                    MidnightSettingSwitchRow(
+                        title = "Startup animation",
+                        description = "Show the Anilife animation when the app opens",
+                        checked = videoLaunchIntro,
+                        onCheckedChange = SettingsStore::setVideoLaunchIntro,
+                    )
                 }
                 item(key = "Arrange Home") {
                     MidnightSettingRow(
@@ -3140,6 +3138,14 @@ fun SettingsScreen(
                         description = "Prompt when a new version is available",
                         checked = updateCheckOnLaunch,
                         onCheckedChange = SettingsStore::setUpdateCheckOnLaunch,
+                    )
+                }
+                item(key = "Receive beta updates") {
+                    MidnightSettingSwitchRow(
+                        title = "Receive beta updates",
+                        description = "Also check tester releases; they may be less stable",
+                        checked = receiveBetaUpdates,
+                        onCheckedChange = SettingsStore::setReceiveBetaUpdates,
                     )
                 }
                 item {

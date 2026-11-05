@@ -519,6 +519,7 @@ object DiagnosticsLog {
         store?.append(newEvent(level, category, name, message, attributes))
     }
 
+    @Suppress("DEPRECATION") // Thread.threadId() is not available to the Java 17 build.
     private fun newEvent(
         level: String,
         category: String,
@@ -566,7 +567,10 @@ object DiagnosticsLog {
         val power = app.getSystemService(Context.POWER_SERVICE) as? PowerManager
         val display = (app.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager)
             ?.getDisplay(Display.DEFAULT_DISPLAY)
-        val hdrTypes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        val hdrTypes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            display?.mode?.supportedHdrTypes?.joinToString("/").orEmpty()
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            @Suppress("DEPRECATION")
             display?.hdrCapabilities?.supportedHdrTypes?.joinToString("/").orEmpty()
         } else {
             "unavailable"

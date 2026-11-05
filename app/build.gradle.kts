@@ -180,7 +180,7 @@ android {
         }
     }
     lint {
-        // The inherited codebase has a large audited lint backlog. Keep it visible in the
+        // The project has a large audited lint backlog. Keep it visible in the
         // baseline while making every newly introduced finding fail CI.
         baseline = file("lint-baseline.xml")
         abortOnError = true

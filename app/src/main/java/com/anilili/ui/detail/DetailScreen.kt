@@ -2089,7 +2089,10 @@ private fun InlineStatus(message: String, loading: Boolean) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (loading) com.anilili.ui.components.WaterFillLogoIndicator(size = 48.dp)
+        if (loading) androidx.compose.material3.CircularProgressIndicator(
+            modifier = Modifier.size(36.dp),
+            strokeWidth = 3.dp,
+        )
         Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

@@ -460,7 +460,10 @@ private fun StartupStillLoading(
 ) {
     Box(modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            com.anilili.ui.components.WaterFillLogoIndicator(size = 72.dp)
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(44.dp),
+                strokeWidth = 3.dp,
+            )
             Text(
                 "Still loading",
                 style = MaterialTheme.typography.titleMedium,

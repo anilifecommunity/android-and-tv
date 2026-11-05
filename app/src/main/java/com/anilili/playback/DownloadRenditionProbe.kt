@@ -1,10 +1,12 @@
 package com.anilili.playback
 
 import android.content.Context
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.MetadataRetriever
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -38,6 +40,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  * reads as the setting being ignored. Knowing the ladder up front is what lets the dialog say so and
  * the queue go looking elsewhere.
  */
+@OptIn(UnstableApi::class)
 internal object DownloadRenditionProbe {
 
     /**
@@ -79,7 +82,14 @@ internal object DownloadRenditionProbe {
             .apply { if (stream.isHls) setMimeType(MimeTypes.APPLICATION_M3U8) }
             .build()
         val groups = withTimeoutOrNull(PROBE_TIMEOUT_MS) {
-            MetadataRetriever.retrieveMetadata(factory, item).awaitResult()
+            val retriever = MetadataRetriever.Builder(context, item)
+                .setMediaSourceFactory(factory)
+                .build()
+            try {
+                retriever.retrieveTrackGroups().awaitResult()
+            } finally {
+                retriever.close()
+            }
         } ?: return null
         return videoHeights(groups)
     }

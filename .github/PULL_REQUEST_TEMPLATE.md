@@ -15,7 +15,7 @@
 - [ ] Mobile lint and debug assemble
 - [ ] TV lint and debug assemble
 - [ ] No secret, signing material, private URL, or user data is included
-- [ ] No public release or production deployment is triggered by this PR
+- [ ] This PR does not trigger a public release or production deployment
 
 ## Rollback
 

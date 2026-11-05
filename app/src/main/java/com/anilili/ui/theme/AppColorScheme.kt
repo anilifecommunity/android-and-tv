@@ -28,7 +28,7 @@ import com.materialkolor.scheme.SchemeVibrant
 @Immutable
 data class ThemeSpec(
     val background: ThemeBackground = ThemeBackground.AMOLED,
-    val accent: ThemeAccent = ThemeAccent.MONOCHROME,
+    val accent: ThemeAccent = ThemeAccent.ANILIFE_GREEN,
     val style: ThemeStyle = ThemeStyle.VIVID,
     val contrast: ThemeContrast = ThemeContrast.STANDARD,
     val playerAccent: Boolean = false,

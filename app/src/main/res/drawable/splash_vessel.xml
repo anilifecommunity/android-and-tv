@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+'s first frame: the same dim Anilife mark that the Compose fill takes over. -->
+<!-- Android 12+'s first frame before the supplied startup animation begins. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:width="166dp"
@@ -7,7 +7,6 @@
         android:gravity="center">
         <bitmap
             android:gravity="fill"
-            android:src="@drawable/anilife_logo_mask"
-            android:tint="#1AFFFFFF" />
+            android:src="@drawable/anilili_launcher" />
     </item>
 </layer-list>

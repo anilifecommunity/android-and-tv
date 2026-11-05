@@ -17,6 +17,7 @@ on:
         type: string
 
 permissions:
+  artifact-metadata: write
   attestations: write
   contents: write
   id-token: write
@@ -31,7 +32,7 @@ env:
 jobs:
   draft:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 75
     environment: release
     env:
@@ -55,13 +56,18 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Validate release input
         shell: bash
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v0\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
-          ! gh release view "$RELEASE_TAG" >/dev/null 2>&1
+          if release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" 2>/dev/null)"; then
+            test "$(jq -r '.draft' <<<"$release_json")" = "true"
+            echo "EXISTING_DRAFT_ID=$(jq -r '.id' <<<"$release_json")" >> "$GITHUB_ENV"
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
@@ -70,10 +76,10 @@ jobs:
           java-version: "17"
 
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: true
 
@@ -109,7 +115,10 @@ jobs:
           for name in "${expected[@]}"; do
             mapfile -t matches < <(find app/build/outputs/apk -type f -name "$name")
             test "${#matches[@]}" -eq 1
-            "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --verbose "${matches[0]}"
+            verify_output="$("$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --verbose "${matches[0]}" 2>&1)" || {
+              printf '%s\n' "$verify_output"
+              exit 1
+            }
             "$ANDROID_HOME/build-tools/35.0.1/zipalign" -c -P 16 4 "${matches[0]}"
             fingerprints+=("$("$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --print-certs "${matches[0]}" |
               sed -n 's/^Signer #1 certificate SHA-256 digest: //p')")
@@ -145,13 +154,13 @@ jobs:
 
       - name: Attest build provenance
         id: provenance
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: dist/*.apk
 
       - name: Attest SBOM
         id: sbom
-        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: dist/*.apk
           sbom-path: dist/Anilife.cdx.json
@@ -171,7 +180,20 @@ jobs:
 
       - name: Create draft prerelease
         shell: bash
-        run: gh release create "$RELEASE_TAG" dist/* --draft --prerelease --title "$RELEASE_TITLE" --notes-file release-notes.txt --target "$GITHUB_SHA"
+        run: |
+          set -euo pipefail
+          if [[ -n "${EXISTING_DRAFT_ID:-}" ]]; then
+            gh api --paginate "repos/$GITHUB_REPOSITORY/releases/$EXISTING_DRAFT_ID/assets" --jq '.[].id' |
+              while read -r asset_id; do
+                gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
+              done
+            gh release upload "$RELEASE_TAG" dist/*
+            gh release edit "$RELEASE_TAG" --draft --prerelease --title "$RELEASE_TITLE" \
+              --notes-file release-notes.txt --target "$GITHUB_SHA"
+          else
+            gh release create "$RELEASE_TAG" dist/* --draft --prerelease --title "$RELEASE_TITLE" \
+              --notes-file release-notes.txt --target "$GITHUB_SHA"
+          fi
 
       - name: Remove signing material
         if: always()

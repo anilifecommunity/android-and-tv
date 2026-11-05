@@ -139,7 +139,7 @@ data, and it builds the key/encryption/relay plumbing everything else uses. Then
 watching + resume points), which is what users will notice. Decide before Phase 1 whether to run our
 own relay — it removes the two biggest risks (retention, old-Android TLS) for little cost.
 
-Open decisions for the owner:
+Open design questions:
 - own relay or public relays only;
 - whether sign-ins (Phase 3) sync at all, or stay per device;
 - recovery: phrase, sealed backup, or both;
