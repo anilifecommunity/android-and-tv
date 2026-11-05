@@ -107,9 +107,16 @@ jobs:
           test "${#unique_fingerprints[@]}" -eq 1
           test "${unique_fingerprints[0]}" = "${ANDROID_SIGNING_CERT_SHA256,,}"
           cp app/build/reports/cyclonedx-direct/bom.json dist/Anilife.cdx.json
-          app_version="$("$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging dist/Anilife.apk |
-            sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p")"
+          package_line="$("$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging dist/Anilife.apk | head -n 1)"
+          app_version="$(sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p" <<<"$package_line")"
+          version_code="$(sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p" <<<"$package_line")"
           test -n "$app_version"
+          test -n "$version_code"
+          for flavor in mobile tv; do
+            mapping="app/build/outputs/mapping-archive/mapping-$flavor-v$app_version-$version_code-${GITHUB_SHA:0:12}.txt"
+            test -s "$mapping"
+            cp "$mapping" dist/
+          done
           jq -e --arg version "$app_version" '
             .bomFormat == "CycloneDX" and
             .specVersion == "1.6" and

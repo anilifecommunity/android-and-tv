@@ -9,8 +9,8 @@ the owner makes that separate decision.
 2. Confirm provider identifiers are Anilife-owned and present in the protected `release` environment.
 3. Confirm approved artwork and its rights record. Placeholder or inherited artwork blocks release.
 4. Run `Signed release candidate` manually from the intended commit.
-5. Download the candidate bundle: six APKs, CycloneDX SBOM, build-provenance and SBOM
-   attestation bundles, signing-certificate record, and `SHA256SUMS`.
+5. Download the candidate bundle: six APKs, two commit-bound R8 mappings, CycloneDX SBOM,
+   build-provenance and SBOM attestation bundles, signing-certificate record, and `SHA256SUMS`.
 6. Verify every checksum, APK signature, package ID, version, form factor, ABI, and min SDK on a
    separate trusted machine. Confirm every APK has the protected release certificate fingerprint,
    and verify the GitHub artifact attestations with `gh attestation verify`.
