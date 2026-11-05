@@ -17,7 +17,9 @@ on:
         type: string
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 concurrency:
   group: draft-release
@@ -45,6 +47,7 @@ jobs:
       ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
       ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
       ANDROID_SIGNING_KEY_ALIAS: ${{ vars.ANDROID_SIGNING_KEY_ALIAS }}
+      ANDROID_SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
       RELEASE_TAG: ${{ inputs.tag }}
       RELEASE_TITLE: ${{ inputs.title }}
       RELEASE_NOTES: ${{ inputs.notes }}
@@ -78,6 +81,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -n "$ANDROID_SIGNING_CERT_SHA256"
           mkdir -p .release
           printf '%s' "$ANDROID_SIGNING_KEYSTORE_BASE64" | base64 --decode > .release/anilife-release.jks
           chmod 600 .release/anilife-release.jks
@@ -92,21 +96,71 @@ jobs:
       - name: Build release APKs
         run: ./gradlew :app:assembleMobileRelease :app:assembleTvRelease --max-workers=2 --no-configuration-cache --console=plain
 
+      - name: Generate CycloneDX SBOM
+        run: ./gradlew :app:cyclonedxDirectBom --max-workers=2 --no-configuration-cache --console=plain
+
       - name: Verify and stage release assets
         shell: bash
         run: |
           set -euo pipefail
           expected=(Anilife.apk Anilife_arm64-v8a.apk Anilife_armeabi-v7a.apk Anilife_tv.apk Anilife_tv_arm64-v8a.apk Anilife_tv_armeabi-v7a.apk)
           mkdir -p dist
+          fingerprints=()
           for name in "${expected[@]}"; do
             mapfile -t matches < <(find app/build/outputs/apk -type f -name "$name")
             test "${#matches[@]}" -eq 1
             "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --verbose "${matches[0]}"
             "$ANDROID_HOME/build-tools/35.0.1/zipalign" -c -P 16 4 "${matches[0]}"
+            fingerprints+=("$("$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --print-certs "${matches[0]}" |
+              sed -n 's/^Signer #1 certificate SHA-256 digest: //p')")
             cp "${matches[0]}" "dist/$name"
           done
-          sha256sum dist/*.apk > dist/SHA256SUMS
+          mapfile -t unique_fingerprints < <(printf '%s\n' "${fingerprints[@]}" | tr '[:upper:]' '[:lower:]' | sort -u)
+          test "${#unique_fingerprints[@]}" -eq 1
+          test "${unique_fingerprints[0]}" = "${ANDROID_SIGNING_CERT_SHA256,,}"
+          cp app/build/reports/cyclonedx-direct/bom.json dist/Anilife.cdx.json
+          app_version="$("$ANDROID_HOME/build-tools/35.0.1/aapt" dump badging dist/Anilife.apk |
+            sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p")"
+          test -n "$app_version"
+          jq -e --arg version "$app_version" '
+            .bomFormat == "CycloneDX" and
+            .specVersion == "1.6" and
+            .metadata.component.name == "Anilife" and
+            .metadata.component.version == $version and
+            .metadata.component.type == "application" and
+            (.components | length) > 0 and
+            (.dependencies | length) > 0
+          ' dist/Anilife.cdx.json >/dev/null
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --print-certs dist/Anilife.apk |
+            grep -E 'Signer #1 certificate DN|Signer #1 certificate SHA-256 digest|Signer #1 public key algorithm|Signer #1 public key size' \
+            > dist/SIGNING-CERTIFICATE.txt
           printf '%s\n' "$RELEASE_NOTES" > release-notes.txt
+
+      - name: Attest build provenance
+        id: provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/*.apk
+
+      - name: Attest SBOM
+        id: sbom
+        uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34 # v3
+        with:
+          subject-path: dist/*.apk
+          sbom-path: dist/Anilife.cdx.json
+
+      - name: Stage attestations and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "${{ steps.provenance.outputs.bundle-path }}" dist/BUILD-PROVENANCE.intoto.jsonl
+          cp "${{ steps.sbom.outputs.bundle-path }}" dist/SBOM-ATTESTATION.intoto.jsonl
+          (
+            cd dist
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' |
+              sort -z |
+              xargs -0 sha256sum > SHA256SUMS
+          )
 
       - name: Create draft prerelease
         shell: bash

@@ -9,9 +9,11 @@ the owner makes that separate decision.
 2. Confirm provider identifiers are Anilife-owned and present in the protected `release` environment.
 3. Confirm approved artwork and its rights record. Placeholder or inherited artwork blocks release.
 4. Run `Signed release candidate` manually from the intended commit.
-5. Download the seven candidate files: six APKs plus `SHA256SUMS`.
-6. Verify every APK signature, package ID, version, form factor, ABI, min SDK, and checksum on a
-   separate trusted machine.
+5. Download the candidate bundle: six APKs, CycloneDX SBOM, build-provenance and SBOM
+   attestation bundles, signing-certificate record, and `SHA256SUMS`.
+6. Verify every checksum, APK signature, package ID, version, form factor, ABI, and min SDK on a
+   separate trusted machine. Confirm every APK has the protected release certificate fingerprint,
+   and verify the GitHub artifact attestations with `gh attestation verify`.
 7. Install and smoke-test the universal mobile and TV APKs, including API 22 or equivalent Fire OS
    coverage, account flows, playback, downloads, updates, backup import, and accessibility.
 
@@ -21,8 +23,9 @@ GitHub release.
 ## Draft release
 
 After the candidate evidence is accepted, run `Draft GitHub release` from `main`. It rebuilds and
-re-verifies the assets behind the same release-environment review gate, then creates a draft
-prerelease. A draft is not public and must be inspected before publication.
+re-verifies the assets behind the same release-environment review gate, regenerates and attests the
+SBOM and build provenance, then creates a draft prerelease. A draft is not public and must be
+inspected before publication.
 
 Publishing the draft requires a fresh explicit owner decision. Do not publish while any asset,
 rights, legal, provider, hardware, CI, or signing gate is unresolved.

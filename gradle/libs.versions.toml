@@ -36,6 +36,7 @@ materialColorUtilities = "2.1.1"
 # Nayuki's QR encoder: one plain-Java class tree, no Android or reflection. Draws the code a phone
 # scans to send a profile picture to the TV.
 qrcodegen = "1.8.0"
+cyclonedx = "3.5.1"
 
 [libraries]
 qrcodegen = { group = "io.nayuki", name = "qrcodegen", version.ref = "qrcodegen" }
@@ -92,3 +93,4 @@ androidx-baselineprofile = { id = "androidx.baselineprofile", version.ref = "ben
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }

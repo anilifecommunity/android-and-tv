@@ -1,7 +1,10 @@
 import com.android.build.OutputFile
 import java.util.Properties
+import org.cyclonedx.gradle.CyclonedxDirectTask
+import org.cyclonedx.model.Component
 
 plugins {
+    alias(libs.plugins.cyclonedx)
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
@@ -19,6 +22,14 @@ val diagnosticBuildSha = providers.environmentVariable("GITHUB_SHA").orNull
     }.getOrDefault("unknown").ifBlank { "unknown" }
 val appVersionCode = 1
 val appVersionName = "0.1.0-beta.1"
+
+tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
+    componentName = "Anilife"
+    componentVersion = appVersionName
+    projectType = Component.Type.APPLICATION
+    includeConfigs = listOf("mobileReleaseRuntimeClasspath", "tvReleaseRuntimeClasspath")
+    testConfigs = emptyList()
+}
 
 val infrastructureProperties = Properties().apply {
     val file = rootProject.file(".env.infrastructure.local")
