@@ -4,7 +4,7 @@ kotlin = "2.1.21"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
-composeBom = "2024.12.01"
+composeBom = "2026.09.00"
 navigation = "2.8.5"
 # 1.9+ raises minSdk to 23. Keep the last API-22-compatible line for Fire OS 5.
 media3 = "1.8.1"
