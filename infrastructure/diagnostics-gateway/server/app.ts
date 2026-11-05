@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { readFile, unlink } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import cookieParser from "cookie-parser";
 import express, { type NextFunction, type Request, type Response } from "express";
@@ -42,8 +42,8 @@ class DailyCapacityError extends Error {}
 
 export function temporaryUploadPath(tempDirectory: string, path: string): string {
   const root = resolve(tempDirectory);
-  const candidate = resolve(path);
-  if (dirname(candidate) !== root) throw new ClientInputError("Invalid temporary upload path");
+  const candidate = resolve(root, basename(path));
+  if (candidate !== resolve(path)) throw new ClientInputError("Invalid temporary upload path");
   return candidate;
 }
 
