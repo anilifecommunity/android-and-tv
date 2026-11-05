@@ -11,12 +11,12 @@ Status values are evidence-based: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED`, or `
 | A11 Community identity | IN PROGRESS | App ID, deep link, version, updater names and visible core identity migrated; device validation remains. |
 | A12 Embedded provider tokens | IN PROGRESS | Kartoons provider is retained; inherited shared tokens are replaced by blank local/mirror configuration pending authorised credentials. |
 | A13 Community index | IN PROGRESS | Android points at the live `anilifecommunity/media-index` tree; degraded-mode validation remains. |
-| A14 OAuth registrations | BLOCKED | Public IDs and portal registrations are owner/external-provider inputs; code must build with integrations disabled. |
+| A14 OAuth registrations | IN PROGRESS | Required public IDs and redirect formats are present in the ignored local infrastructure file; device sign-in validation remains. |
 | A15 Security boundaries | TODO | Exported components, imports, backup and logs need targeted review. |
-| A16 Anilife brand migration | IN PROGRESS | Core UI and release identity migrated; owner-approved launcher/TV artwork remains blocked. |
-| A17 Assets and external identities | BLOCKED | Owner-approved Anilife artwork and provider registrations are not yet available. Compile-safe placeholders/disabled integrations are allowed. |
-| A20 CI | IN PROGRESS | Bounded SHA-pinned mobile/TV jobs and repository templates added; required-check enforcement follows green runs. |
-| A21 Dependency upgrades | TODO | Deliberately separate from identity/security work. |
+| A16 Anilife brand migration | IN PROGRESS | Owner-supplied AL artwork now covers launcher variants, themed icons, splash/loading, TV, docs, and the generated wordmark; hardware visual checks remain. |
+| A17 Assets and external identities | IN PROGRESS | Required public IDs are locally configured and the logo is integrated; Kartoons still needs an explicitly authorised token source. |
+| A20 CI | IN PROGRESS | SHA-pinned mobile/TV CI, CodeQL, dependency review, Dependabot, secret scanning, and push protection are configured; required-check enforcement follows green runs. |
+| A21 Dependency upgrades | IN PROGRESS | Diagnostics gateway lock refreshed and migrated to the supported Cloudflare Vitest plugin with zero npm audit findings; Android and Actions update PRs remain individually gated. |
 | A22 AGP 9 feasibility | TODO | Deprecated output API confirmed; no migration attempted yet. |
 | A23 Reproducibility/native ABI | TODO | Native strip warnings observed; APK checks pending. |
 | A30 Local performance | TODO | Existing diagnostics inventory pending. |

@@ -1,4 +1,4 @@
-"""Generate the phone flavor's accent-coloured launcher icons from the default art.
+"""Generate Anilife's Android, TV, docs, and accent-coloured launcher artwork.
 
 The app icon follows the theme's accent preset (see IconVariants.kt): Android cannot recolour a
 launcher icon at runtime, so each preset ships as its own icon behind its own activity-alias in
@@ -7,23 +7,25 @@ change to the icon is one edit followed by a re-run:
 
     python scripts/generate_icon_variants.py
 
-The default icon is a single flat colour on black. Each pixel's brightness relative to that colour
-becomes the strength of the accent at that pixel, which keeps anti-aliased edges and the black
-ground exactly as drawn. Keys and colours mirror ThemeAccent in ThemeSettings.kt.
+The canonical transparent mark lives at docs/assets/anilife-logo-transparent.png. White stays white
+and the mark's pink accent follows ThemeAccent in generated icon variants.
 """
 
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 APP = Path(__file__).resolve().parent.parent / "app" / "src"
 RES = APP / "main" / "res"
+ROOT = APP.parents[1]
+MASTER = ROOT / "docs" / "assets" / "anilife-logo-transparent.png"
 # Written into the mobile flavor only: the TV flavor keeps one fixed icon and never ships these.
 OUT = APP / "mobile" / "res"
 # Adaptive-icon foregrounds are 108dp; 432px is that at xxxhdpi, the densest bucket a phone draws.
 FOREGROUND_PX = 432
 DENSITIES = ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]
+DENSITY_SIZES = dict(zip(DENSITIES, [48, 72, 96, 144, 192]))
 
 ACCENTS = {
     # Midnight's black and white: the mark in white on the same black ground.
@@ -53,24 +55,79 @@ def recolor(image: Image.Image, accent: int) -> Image.Image:
     rgba = np.asarray(image.convert("RGBA")).astype(np.float32) / 255.0
     rgb, alpha = rgba[..., :3], rgba[..., 3:]
     value = rgb.max(axis=-1, keepdims=True)
-    # The mark's own brightness: the 90th percentile of clearly-lit pixels, so a few highlight
-    # pixels cannot set the scale and dim everything else.
-    mark = np.percentile(value[(value > 0.5) & (alpha > 0.5)], 90)
-    strength = np.clip(value / mark, 0.0, 1.0)
     color = np.array([(accent >> 16) & 0xFF, (accent >> 8) & 0xFF, accent & 0xFF], np.float32) / 255.0
-    out = np.concatenate([strength * color, alpha], axis=-1)
+    # Pink has materially more red than green. Preserve the white strokes and recolour only that
+    # accent; the continuous blend keeps the source's anti-aliased pink/white edges intact.
+    pink = np.clip((rgb[..., 0:1] - rgb[..., 1:2]) * 4.0, 0.0, 1.0)
+    target = (1.0 - pink) + pink * color
+    out = np.concatenate([target * value, alpha], axis=-1)
     return Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGBA")
 
 
+def mark(size: int, fraction: float = 0.78) -> Image.Image:
+    source = Image.open(MASTER).convert("RGBA")
+    source = source.crop(source.getchannel("A").getbbox())
+    edge = round(size * fraction)
+    source.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGBA", (size, size))
+    canvas.alpha_composite(source, ((size - source.width) // 2, (size - source.height) // 2))
+    return canvas
+
+
+def on_black(image: Image.Image) -> Image.Image:
+    canvas = Image.new("RGBA", image.size, "#0B0B0F")
+    canvas.alpha_composite(image)
+    return canvas.convert("RGB")
+
+
+def wordmark(width: int, height: int, mark_size: int, font_size: int) -> Image.Image:
+    canvas = Image.new("RGBA", (width, height))
+    logo = mark(mark_size, 0.92)
+    canvas.alpha_composite(logo, (8, (height - mark_size) // 2))
+    font = ImageFont.truetype(RES / "font" / "inter_bold.ttf", font_size)
+    draw = ImageDraw.Draw(canvas)
+    text = "ANILIFE"
+    bounds = draw.textbbox((0, 0), text, font=font)
+    draw.text((mark_size + 18, (height - (bounds[3] - bounds[1])) // 2 - bounds[1]), text, font=font, fill="white")
+    return canvas
+
+
 def main() -> None:
-    foreground = Image.open(RES / "drawable" / "anilili_launcher.png")
+    if not MASTER.exists():
+        raise SystemExit(f"missing canonical logo: {MASTER}")
+    source = np.asarray(Image.open(MASTER).convert("RGBA"))
+    visible = source[..., 3] > 128
+    assert visible.any() and ((source[..., 0] - source[..., 1] > 40) & visible).any(), "logo must contain white and pink artwork"
+
+    # Android guarantees only the central 66/108dp circle across adaptive-icon masks.
+    foreground = mark(FOREGROUND_PX, 0.62)
+    foreground.save(RES / "drawable" / "anilili_launcher.png", optimize=True)
+    mask = mark(512, 0.98)
+    alpha = mask.getchannel("A")
+    mask = Image.new("RGBA", mask.size, "white")
+    mask.putalpha(alpha)
+    mask.save(RES / "drawable-nodpi" / "anilife_logo_mask.png", optimize=True)
+    mask.save(ROOT / "docs" / "assets" / "logo-mask.png", optimize=True)
+
+    icon = on_black(mark(1024))
+    icon.save(ROOT / "docs" / "assets" / "icon.png", optimize=True)
+    on_black(mark(320)).save(APP / "tv" / "res" / "drawable-nodpi" / "tv_launcher_icon.png", optimize=True)
+    wordmark(546, 130, 120, 76).save(RES / "drawable-nodpi" / "anilili_header_wordmark.png", optimize=True)
+    banner = Image.new("RGBA", (320, 180), "#0B0B0F")
+    banner.alpha_composite(wordmark(304, 120, 108, 43), (8, 30))
+    banner.convert("RGB").save(RES / "drawable-nodpi" / "tv_banner_art.png", optimize=True)
+
+    for density, size in DENSITY_SIZES.items():
+        base = on_black(mark(size))
+        base.save(RES / f"mipmap-{density}" / "ic_launcher.png", optimize=True)
+        base.save(RES / f"mipmap-{density}" / "ic_launcher_round.png", optimize=True)
+
     nodpi = OUT / "drawable-nodpi"
     anydpi = OUT / "mipmap-anydpi-v26"
     for folder in [nodpi, anydpi] + [OUT / f"mipmap-{d}" for d in DENSITIES]:
         folder.mkdir(parents=True, exist_ok=True)
     for key, accent in ACCENTS.items():
-        # The foreground is opaque RGB; RGB keeps the file small and matches the default's format.
-        recolor(foreground, accent).convert("RGB").resize(
+        recolor(foreground, accent).resize(
             (FOREGROUND_PX, FOREGROUND_PX), Image.LANCZOS,
         ).save(nodpi / f"anilili_launcher_{key}.png", optimize=True)
         for name in ("ic_launcher", "ic_launcher_round"):

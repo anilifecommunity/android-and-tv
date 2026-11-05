@@ -1,5 +1,14 @@
 # Anilife for Android and TV
 
+<p align="center">
+  <img src="docs/assets/icon.png" width="160" alt="Anilife AL play-mark logo">
+</p>
+
+<p align="center">
+  <a href="https://github.com/anilifecommunity/android-and-tv/actions/workflows/ci.yml"><img alt="Android CI" src="https://github.com/anilifecommunity/android-and-tv/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/anilifecommunity/android-and-tv/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/anilifecommunity/android-and-tv/actions/workflows/codeql.yml/badge.svg"></a>
+</p>
+
 Anilife is a community-maintained native Kotlin and Jetpack Compose anime client for phones,
 tablets, Android TV, Google TV, and Fire TV. One codebase produces `mobile` and `tv` flavours while
 preserving Android 5.1 / Fire OS 5 (`minSdk 22`) and 32-bit ARM support.
@@ -91,8 +100,8 @@ URLs, account identifiers, and personal data from logs or screenshots.
 
 The evidence baseline and task-by-task programme live under `docs/revamp/` and in the
 [Anilife Android + TV Revamp milestone](https://github.com/anilifecommunity/android-and-tv/milestone/1).
-Current blockers are tracked explicitly; missing artwork, provider registrations, hardware tests,
-or legal/rights review are never reported as completed work.
+Current blockers are tracked explicitly; authorised provider credentials, hardware tests, or
+legal/rights review are never reported as completed work.
 
 ## Licence and content boundary
 

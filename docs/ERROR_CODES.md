@@ -31,7 +31,7 @@ error number, kept because it is more precise than anything this app invents:
 | `NET-09` | Search didn't come back. | Try again |
 | `NET-10` | A server is asking this device to prove it isn't a bot. | Try again |
 | `NET-11` | Couldn't load this title. | Try again |
-| `NET-12` | Your network is blocking this server. Try another network or a VPN. | — |
+| `NET-12` | Your network is blocking this server. Try another network or a VPN. | &mdash; |
 | `NET-13` | Couldn't pick a random anime. | Try again |
 
 ## Sources — `SRC`
@@ -59,22 +59,22 @@ error number, kept because it is more precise than anything this app invents:
 | `PLAY-05` | Couldn't play this download. | Send diagnostics |
 | `PLAY-06` | The web player didn't load. | Try another server |
 | `PLAY-07` | No other video player is installed to open this with. | Open settings |
-| `PLAY-08` | This copy can't be handed to another player. | — |
-| `PLAY-09` | No app on this device can open a web page. | — |
+| `PLAY-08` | This copy can't be handed to another player. | &mdash; |
+| `PLAY-09` | No app on this device can open a web page. | &mdash; |
 | `PLAY-10` | Your network is blocking this video server. | Try another server |
 
 ## Subtitles — `SUB`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
-| `SUB-01` | No subtitle tracks for this video. | — |
+| `SUB-01` | No subtitle tracks for this video. | &mdash; |
 | `SUB-02` | Couldn't read that subtitle file. | Choose a file |
-| `SUB-03` | No file picker on this device. | — |
-| `SUB-04` | Pick a subtitle track first. | — |
+| `SUB-03` | No file picker on this device. | &mdash; |
+| `SUB-04` | Pick a subtitle track first. | &mdash; |
 | `SUB-05` | Subtitle search didn't come back. | Try again |
 | `SUB-06` | Couldn't download that subtitle. | Try again |
 | `SUB-07` | Sign in to OpenSubtitles in Settings first. | Open settings |
-| `SUB-08` | No lines were found near that moment. | — |
+| `SUB-08` | No lines were found near that moment. | &mdash; |
 | `SUB-09` | Couldn't reach AniSkip. | Try again |
 
 ## Downloads — `DL`
@@ -85,8 +85,8 @@ error number, kept because it is more precise than anything this app invents:
 | `DL-02` | Download failed. | Try again |
 | `DL-03` | Not enough space left on this device. | Free up space |
 | `DL-04` | Download stalled. | Try again |
-| `DL-05` | Couldn't save this episode's subtitles. | — |
-| `DL-06` | No app can open these download options. | — |
+| `DL-05` | Couldn't save this episode's subtitles. | &mdash; |
+| `DL-06` | No app can open these download options. | &mdash; |
 
 ## Saving to device — `EXP`
 
@@ -96,13 +96,13 @@ error number, kept because it is more precise than anything this app invents:
 | `EXP-02` | Not enough free space to build the MP4. | Free up space |
 | `EXP-03` | Not enough free space on %s. | Free up space |
 | `EXP-04` | Couldn't save this episode as an MP4. It still plays in the app. | Save again |
-| `EXP-05` | This device can't build MP4 files. Episodes still play in the app. | — |
+| `EXP-05` | This device can't build MP4 files. Episodes still play in the app. | &mdash; |
 | `EXP-06` | Built the MP4 but couldn't write it to %s. | Save again |
 | `EXP-07` | Lost access to the chosen download folder. | Open settings |
 | `EXP-08` | Storage permission is needed to save files here. | Open settings |
-| `EXP-09` | Device storage isn't available right now. | — |
+| `EXP-09` | Device storage isn't available right now. | &mdash; |
 | `EXP-10` | The chosen save location isn't connected. | Open settings |
-| `EXP-11` | That download is no longer on this device. | — |
+| `EXP-11` | That download is no longer on this device. | &mdash; |
 
 ## Accounts — `ACC`
 
@@ -127,11 +127,11 @@ error number, kept because it is more precise than anything this app invents:
 | --- | --- | --- |
 | `BAK-01` | Couldn't read that file. | Choose a file |
 | `BAK-02` | Couldn't write the export file. | Try again |
-| `BAK-03` | That isn't an Anilili backup. | Choose a file |
+| `BAK-03` | That isn't an Anilife backup. | Choose a file |
 | `BAK-04` | That isn't a MyAnimeList export file. | Choose a file |
 | `BAK-05` | No anime entries in that file. | Choose a file |
-| `BAK-06` | Nothing here can be exported. | — |
-| `BAK-07` | No file picker on this device. | — |
+| `BAK-06` | Nothing here can be exported. | &mdash; |
+| `BAK-07` | No file picker on this device. | &mdash; |
 
 ## TV pairing — `PAIR`
 
@@ -139,10 +139,10 @@ error number, kept because it is more precise than anything this app invents:
 | --- | --- | --- |
 | `PAIR-01` | Nothing is listening on %s. | Try again |
 | `PAIR-02` | No reply from %s. | Try again |
-| `PAIR-03` | Can't reach %s from this phone. | — |
-| `PAIR-04` | That isn't an address this phone understands. | — |
+| `PAIR-03` | Can't reach %s from this phone. | &mdash; |
+| `PAIR-04` | That isn't an address this phone understands. | &mdash; |
 | `PAIR-05` | The television closed the connection. | Try again |
-| `PAIR-06` | The two devices disagreed. | — |
+| `PAIR-06` | The two devices disagreed. | &mdash; |
 | `PAIR-07` | No televisions found on this network. | Try again |
 | `PAIR-08` | Nothing connected in time. | Try again |
 | `PAIR-09` | Pairing didn't complete. | Try again |
@@ -155,8 +155,8 @@ error number, kept because it is more precise than anything this app invents:
 | `UPD-02` | No signed update was found. | Try again |
 | `UPD-03` | The update didn't finish downloading. | Try again |
 | `UPD-04` | Couldn't make room for the update. | Free up space |
-| `UPD-05` | This device refused to install the update. | — |
-| `UPD-06` | No installer on this device accepted the update. | — |
+| `UPD-05` | This device refused to install the update. | &mdash; |
+| `UPD-06` | No installer on this device accepted the update. | &mdash; |
 
 ## Diagnostics — `DIAG`
 
@@ -164,13 +164,13 @@ error number, kept because it is more precise than anything this app invents:
 | --- | --- | --- |
 | `DIAG-01` | Couldn't prepare the diagnostics report. | Try again |
 | `DIAG-02` | Couldn't read the selected screenshot. | Choose a file |
-| `DIAG-03` | Couldn't record diagnostics on this device. | — |
+| `DIAG-03` | Couldn't record diagnostics on this device. | &mdash; |
 
 ## Links — `DLINK`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
-| `DLINK-01` | That Anilili link isn't one this app understands. | — |
+| `DLINK-01` | That Anilife link isn't one this app understands. | &mdash; |
 
 ## App — `APP`
 

@@ -150,7 +150,7 @@ internal fun renderErrorCodeTable(): String = buildString {
         appendLine("| --- | --- | --- |")
         entries.forEach { error ->
             val message = error.userMessage.replace("|", "\\|")
-            appendLine("| `${error.code}` | $message | ${error.action?.label ?: "—"} |")
+            appendLine("| `${error.code}` | $message | ${error.action?.label ?: "&mdash;"} |")
         }
     }
 }

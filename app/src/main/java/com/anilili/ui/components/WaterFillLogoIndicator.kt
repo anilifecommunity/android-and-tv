@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
@@ -30,8 +31,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.anilili.R
 import com.anilili.ui.adaptive.LocalAppDeviceProfile
 import kotlin.math.PI
 import kotlin.math.max
@@ -84,7 +87,7 @@ private val BubbleSpecs = listOf(
 )
 
 /**
- * The shared app loader: the Anilili silhouette filling with liquid.
+ * The shared app loader: the Anilife mark filling with liquid.
  *
  * [playOnce] is the launch splash: one pour to full, then [onFilled]. Everywhere else it loops —
  * pour, a beat full, drain, a beat empty — so whatever moment it is dismissed at, it was mid-motion
@@ -110,6 +113,7 @@ fun WaterFillLogoIndicator(
     onFilled: () -> Unit = {},
 ) {
     val elapsed = rememberLiquidClock(playOnce, fillDurationMillis, onFilled)
+    val logoMask = ImageBitmap.imageResource(R.drawable.anilife_logo_mask)
     val entranceMillis = (fillDurationMillis / 4).coerceIn(200, 500).toFloat()
     val layered = modifier
         .size(size)
@@ -129,9 +133,9 @@ fun WaterFillLogoIndicator(
         }
 
     if (LocalAppDeviceProfile.current.useLowCostTvEffects) {
-        PlainWaterFillLogo(layered, elapsed, playOnce, color, vesselColor, fillDurationMillis)
+        PlainWaterFillLogo(layered, logoMask, elapsed, playOnce, color, vesselColor, fillDurationMillis)
     } else {
-        DetailedWaterFillLogo(layered, elapsed, playOnce, color, vesselColor, fillDurationMillis)
+        DetailedWaterFillLogo(layered, logoMask, elapsed, playOnce, color, vesselColor, fillDurationMillis)
     }
 }
 
@@ -242,6 +246,7 @@ private fun liquidLevel(elapsedMillis: Float, playOnce: Boolean, fillDurationMil
 @Composable
 private fun DetailedWaterFillLogo(
     modifier: Modifier,
+    logoMask: ImageBitmap,
     elapsed: FloatState,
     playOnce: Boolean,
     color: Color,
@@ -253,7 +258,7 @@ private fun DetailedWaterFillLogo(
     val surface = remember { Path() }
     Spacer(
         modifier.drawWithCache {
-            val mask = silhouetteMask(size)
+            val mask = silhouetteMask(size, logoMask)
             val frame = silhouetteFrame(size)
             val brush = ShaderBrush(ImageShader(mask, TileMode.Clamp, TileMode.Clamp))
             val minDimension = size.minDimension
@@ -354,6 +359,7 @@ private fun DetailedWaterFillLogo(
 @Composable
 private fun PlainWaterFillLogo(
     modifier: Modifier,
+    logoMask: ImageBitmap,
     elapsed: FloatState,
     playOnce: Boolean,
     color: Color,
@@ -362,7 +368,7 @@ private fun PlainWaterFillLogo(
 ) {
     Spacer(
         modifier.drawWithCache {
-            val mask = silhouetteMask(size)
+            val mask = silhouetteMask(size, logoMask)
             val frame = silhouetteFrame(size)
             val tint = ColorFilter.tint(color)
             val vessel = ColorFilter.tint(vesselColor)

@@ -1,5 +1,5 @@
 {
-  "name": "anilili-diagnostics-gateway",
+  "name": "anilife-diagnostics-gateway",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -34,7 +34,7 @@
     "yauzl": "^3.2.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.19.1",
+    "@cloudflare/vitest-plugin": "^1.5.1",
     "@cloudflare/workers-types": "^5.20260730.1",
     "@types/cookie-parser": "^1.4.9",
     "@types/express": "^5.0.3",
