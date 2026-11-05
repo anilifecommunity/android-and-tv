@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Anilili</string>
+    <string name="app_name">Anilife</string>
     <string name="download_notification_channel_name">Episode downloads</string>
     <string name="download_notification_channel_description">Progress for episodes saved for offline viewing</string>
     <plurals name="download_batch_completed">
@@ -20,7 +20,7 @@
     <string name="external_playback_notification_channel_name">External playback</string>
     <string name="external_playback_notification_channel_description">Keeps protected streams available to another player</string>
     <string name="external_playback_notification_title">Playing in another app</string>
-    <string name="external_playback_notification_description">Anilili is keeping this stream available</string>
+    <string name="external_playback_notification_description">Anilife is keeping this stream available</string>
     <string name="external_playback_notification_stop">Stop</string>
     <string name="diagnostics_shortcut_short">Diagnostics</string>
     <string name="diagnostics_shortcut_long">Send diagnostics</string>

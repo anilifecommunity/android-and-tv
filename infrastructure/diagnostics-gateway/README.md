@@ -1,6 +1,6 @@
-# Anilili Diagnostic Console
+# Anilife Diagnostic Console
 
-Cloudflare Workers receiver and administrator dashboard for user-approved Anilili diagnostic
+Cloudflare Workers receiver and administrator dashboard for user-approved Anilife diagnostic
 reports. Android and TV send the multipart request covered by `DiagnosticUploadClientTest`; the
 Worker validates and stores reports in the private `anilili/anilili-diagnostics` Hugging Face
 Storage Bucket.

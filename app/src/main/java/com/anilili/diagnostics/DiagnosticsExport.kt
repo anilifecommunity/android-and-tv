@@ -33,10 +33,10 @@ import java.io.File
 internal object DiagnosticsExport {
 
     /** Same folder the episode exports use, so a viewer has one place to look. */
-    private const val FOLDER = "Anilili"
+    private const val FOLDER = "Anilife"
 
     /**
-     * Copies [report] into `Downloads/Anilili`, returning a viewer-readable path or null.
+     * Copies [report] into `Downloads/Anilife`, returning a viewer-readable path or null.
      *
      * Never throws. A report that cannot be copied is not a failed report — the share sheet is
      * still opening behind this — so every failure is logged and swallowed rather than surfaced as

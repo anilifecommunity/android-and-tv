@@ -11,7 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The `anilili://` cases both apps must answer alike: the parity corpus's `links.json`. */
+/** The `anilife://` cases are shared through the parity corpus's `links.json`. */
 class AnililiLinkTest {
 
     private val corpus = ParityCorpus.load("links.json")
@@ -49,31 +49,31 @@ class AnililiLinkTest {
     fun `query values decode the way a form does`() {
         assertEquals(
             AnililiLink.Search("100% & more"),
-            AnililiLink.parse("anilili://search?q=100%+%26+more"),
+            AnililiLink.parse("anilife://search?q=100%+%26+more"),
         )
-        assertEquals(AnililiLink.Search("ü"), AnililiLink.parse("anilili://search?q=%C3%BC"))
-        assertEquals(AnililiLink.Search("x"), AnililiLink.parse("anilili://search?from=a&q=x&q=y#frag"))
+        assertEquals(AnililiLink.Search("ü"), AnililiLink.parse("anilife://search?q=%C3%BC"))
+        assertEquals(AnililiLink.Search("x"), AnililiLink.parse("anilife://search?from=a&q=x&q=y#frag"))
     }
 
     @Test
     fun `numbers follow the desktop's grammar, not Kotlin's`() {
         // Kotlin's own parsers would take each of these.
-        for (text in listOf("anilili://watch/1/1d", "anilili://watch/1/0x10", "anilili://anime/١٢", "anilili://watch/1/NaN")) {
+        for (text in listOf("anilife://watch/1/1d", "anilife://watch/1/0x10", "anilife://anime/١٢", "anilife://watch/1/NaN")) {
             assertTrue(text, AnililiLink.read(text) is AnililiLink.Reading.Refused)
         }
-        assertEquals(AnililiLink.Watch(1, 5.0), AnililiLink.parse("anilili://watch/1/5."))
-        assertEquals(AnililiLink.Watch(1, 0.0), AnililiLink.parse("anilili://watch/1/-0"))
-        assertEquals(AnililiLink.Anime(4), AnililiLink.parse("anilili://anime/+4"))
+        assertEquals(AnililiLink.Watch(1, 5.0), AnililiLink.parse("anilife://watch/1/5."))
+        assertEquals(AnililiLink.Watch(1, 0.0), AnililiLink.parse("anilife://watch/1/-0"))
+        assertEquals(AnililiLink.Anime(4), AnililiLink.parse("anilife://anime/+4"))
         // The one deliberate difference: routes here carry an Int id, the desktop's an i64. No
         // AniList id is anywhere near the boundary.
-        assertEquals(null, AnililiLink.parse("anilili://anime/4294967296"))
+        assertEquals(null, AnililiLink.parse("anilife://anime/4294967296"))
     }
 
     @Test
     fun `an episode label is the number as both apps write it`() {
         assertEquals("6.5", AnililiLink.Watch(1, 6.5).episodeLabel)
         assertEquals("3", AnililiLink.Watch(1, 3.0).episodeLabel)
-        assertEquals("anilili://watch/1/12.25?t=9", AnililiLink.Watch(1, 12.25, 9.99).toUrl())
+        assertEquals("anilife://watch/1/12.25?t=9", AnililiLink.Watch(1, 12.25, 9.99).toUrl())
     }
 
     private fun linkOf(case: kotlinx.serialization.json.JsonObject): AnililiLink {

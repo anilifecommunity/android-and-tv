@@ -448,10 +448,10 @@ internal fun SeasonDownloadDialog(
         // the difference is a viewer finding Downloads/Anilili full or empty an hour later.
         MidnightInlineNotice(
             when (downloadDestination) {
-                DownloadDestination.APP_ONLY -> "Kept in the Anilili offline library."
+                DownloadDestination.APP_ONLY -> "Kept in the Anilife offline library."
                 DownloadDestination.DEVICE_ONLY -> "Saved as MP4 files in $locationLabel."
                 DownloadDestination.BOTH ->
-                    "Kept in the Anilili library and saved as MP4 files in $locationLabel."
+                    "Kept in the Anilife library and saved as MP4 files in $locationLabel."
             },
         )
     }

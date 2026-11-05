@@ -1,6 +1,7 @@
 package com.anilili.data.remote
 
 import android.content.Context
+import com.anilili.BuildConfig
 import com.anilili.data.model.Media
 import com.anilili.data.model.SkipTimes
 import com.anilili.data.model.SourcesResult
@@ -72,6 +73,7 @@ internal class RiftProvider(
     context: Context,
     private val client: OkHttpClient,
     private val json: Json,
+    private val firebaseApiKey: String = BuildConfig.RIFT_FIREBASE_API_KEY,
 ) {
     private val prefs = context.applicationContext
         .getSharedPreferences(RiftParser.PREFS, Context.MODE_PRIVATE)
@@ -329,6 +331,7 @@ internal class RiftProvider(
     // ---- Session ---------------------------------------------------------------------------
 
     private fun session(): RiftParser.Session = synchronized(sessionLock) {
+        check(firebaseApiKey.isNotBlank()) { "Rift has no authorised Firebase API key" }
         session?.let { return it }
         val stored = RiftParser.Session(
             fid = prefs.getString(KEY_FID, null).orEmpty(),
@@ -404,7 +407,7 @@ internal class RiftProvider(
             headers = mapOf(
                 "X-Android-Package" to RiftParser.ANDROID_PACKAGE,
                 "X-Android-Cert" to RiftParser.ANDROID_CERT,
-                "x-goog-api-key" to RiftParser.FIREBASE_API_KEY,
+                "x-goog-api-key" to firebaseApiKey,
                 "x-firebase-client" to RiftParser.FIREBASE_CLIENT,
                 "Accept" to "application/json",
                 "Cache-Control" to "no-cache",
@@ -436,7 +439,7 @@ internal class RiftProvider(
             method = "POST",
             body = body,
             headers = mapOf(
-                "X-Goog-Api-Key" to RiftParser.FIREBASE_API_KEY,
+                "X-Goog-Api-Key" to firebaseApiKey,
                 "X-Android-Package" to RiftParser.ANDROID_PACKAGE,
                 "X-Android-Cert" to RiftParser.ANDROID_CERT,
                 "X-Goog-Firebase-Installations-Auth" to token,
@@ -623,7 +626,6 @@ internal object RiftParser {
     const val ANDROID_CERT = "AF40CE82A52AA4107F311D8B9727D01C8D02250B"
     const val INSTALL_SOURCE = "IS_INSTALLED_FROM_PLAY_PACKAGE_INSTALLER"
     const val FIREBASE_APP_ID = "1:536921039715:android:78825c96b74de921b8e956"
-    const val FIREBASE_API_KEY = "AIzaSyBiLkiGEm7ruugny3tDFHEZvqli8yv1k7I"
     const val FIREBASE_CLIENT =
         "H4sIAAAAAAAA_6tWykhNLCpJSk0sKVayio7VUSpLLSrOzM9TslIyUqoFAFyivEQfAAAA"
     const val APP_BUILD = "68"

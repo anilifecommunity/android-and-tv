@@ -221,7 +221,7 @@ private fun BrowsingContent(
         ) {
             CircularProgressIndicator(Modifier.padding(4.dp))
             Text(
-                "Looking for televisions running Anilili…",
+                "Looking for televisions running Anilife...",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

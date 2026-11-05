@@ -119,7 +119,7 @@ class AppBackupTest {
     @Test
     fun `the file name is dated so two backups do not read as one`() {
         val name = AppBackup.fileName(java.time.LocalDate.of(2026, 8, 23))
-        assertEquals("Anilili-backup-20260823.json", name)
+        assertEquals("Anilife-backup-20260823.json", name)
     }
 
     @Test

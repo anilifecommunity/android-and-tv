@@ -79,13 +79,14 @@ sealed interface SimklSignIn {
  * rotate — but a refresh kills the previous access token at once, so refreshes are serialised.
  */
 object SimklAuthManager {
-    const val CLIENT_ID = "6cb9e1ceb75ce68500b9c2a673a92a24c0fbbde1fe524c1b55b7540352cb090f"
+    val CLIENT_ID: String get() = BuildConfig.SIMKL_CLIENT_ID
+    val isConfigured: Boolean get() = CLIENT_ID.isNotBlank()
 
     /** Registered on the app; the token exchange must present it byte for byte. */
-    const val REDIRECT_URI = "anilili://auth/simkl"
+    const val REDIRECT_URI = "anilife://auth/simkl"
 
     /** The `app-name` every API call carries, so Simkl can tell this app's traffic apart. */
-    const val APP_NAME = "anilili"
+    const val APP_NAME = "anilife"
 
     private const val AUTHORIZE_ENDPOINT = "https://simkl.com/oauth2/authorize"
     private const val TOKEN_ENDPOINT = "https://api.simkl.com/oauth2/token"
@@ -111,7 +112,7 @@ object SimklAuthManager {
      */
     private const val DEVICE_TIMEOUT_MS = 10L * 60 * 1000
 
-    val userAgent: String get() = "anilili/${BuildConfig.VERSION_NAME}"
+    val userAgent: String get() = "anilife/${BuildConfig.VERSION_NAME}"
 
     private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -157,6 +158,7 @@ object SimklAuthManager {
      * field: Android may kill this process while the viewer is away in the browser.
      */
     fun authorizeUrl(): String {
+        check(isConfigured) { "Simkl is not configured for this Anilife build." }
         val state = randomUrlSafe(24)
         val verifier = randomUrlSafe(48)
         pendingStore.save(

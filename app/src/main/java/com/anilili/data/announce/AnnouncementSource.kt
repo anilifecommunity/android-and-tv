@@ -31,12 +31,12 @@ import okhttp3.Request
  */
 object AnnouncementSource {
     /** Same key and kind as the update manifest; the d-tag is what makes it a separate channel. */
-    const val D_TAG = "anilili-announcement"
-    private const val SUBSCRIPTION_ID = "anilili-announcement"
+    const val D_TAG = "anilife-announcement"
+    private const val SUBSCRIPTION_ID = "anilife-announcement"
 
     /** The same signed event served as a file, so the common case is one request, not a relay scan. */
     const val MIRROR_URL =
-        "https://huggingface.co/HF_USER/HF_REPO/resolve/main/latest/announcement.json"
+        "https://github.com/anilifecommunity/android-and-tv/releases/latest/download/announcement.json"
 
     /**
      * The newest valid announcement, or null when there is nothing to say.
@@ -117,7 +117,7 @@ internal fun parseAnnouncement(json: Json, content: String): Announcement? = run
     val message = body["message"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank) ?: return null
     Announcement(
         id = id,
-        title = body["title"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank) ?: "Anilili",
+        title = body["title"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank) ?: "Anilife",
         message = message,
         url = sanitizeAnnouncementUrl(body["url"]?.jsonPrimitive?.content),
         urlLabel = body["urlLabel"]?.jsonPrimitive?.content?.takeIf(String::isNotBlank),

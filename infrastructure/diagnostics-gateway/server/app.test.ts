@@ -82,7 +82,7 @@ function diagnosticZip(events = '{"category":"app","name":"process.start"}\n'): 
     zipSync({
       "manifest.json": strToU8(JSON.stringify({ appVersion: "0.1.51", versionCode: 52 })),
       "events.jsonl": strToU8(events),
-      "summary.txt": strToU8("Anilili diagnostic report"),
+      "summary.txt": strToU8("Anilife diagnostic report"),
     }),
   );
 }

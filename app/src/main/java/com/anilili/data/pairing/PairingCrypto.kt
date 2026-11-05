@@ -18,7 +18,7 @@ import javax.crypto.spec.SecretKeySpec
  * dependency — so the same code runs identically off-device.
  */
 internal object PairingCrypto {
-    const val PROTOCOL_LABEL = "anilili-pair/1"
+    const val PROTOCOL_LABEL = "anilife-pair/1"
 
     const val PRIVATE_KEY_BYTES = 32
     const val PUBLIC_KEY_BYTES = 65

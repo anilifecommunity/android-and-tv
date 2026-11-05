@@ -222,9 +222,9 @@ internal class DiscordGateway(private val httpClient: OkHttpClient) {
     private fun sendIdentify(accessToken: String) {
         val properties = JSONObject()
             .put("os", "Android")
-            .put("browser", "Anilili")
+            .put("browser", "Anilife")
             .put("device", "Android")
-            .put("browser_user_agent", "Anilili")
+            .put("browser_user_agent", "Anilife")
             .put("browser_version", "1.0")
             .put("client_version", "1.0")
             .put("client_build_number", 1)

@@ -216,7 +216,7 @@ private fun SimklDeviceSignInDialog(onDismiss: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 listOf(
                     "Scan the code with your phone, or go to simkl.com/pin.",
-                    "Enter this code there, then approve Anilili.",
+                    "Enter this code there, then approve Anilife.",
                 ).forEachIndexed { index, step ->
                     Text(
                         "${index + 1}.  $step",

@@ -561,7 +561,7 @@ object BulkEpisodeDownloads {
      * Asks for the Downloads-folder MP4 whenever the viewer's chosen destination calls for one.
      *
      * The queue behind the anime page reached this point doing nothing at all, so the same episode
-     * came out as an MP4 in `Downloads/Anilili` when downloaded from the player and as cache
+     * came out as an MP4 in `Downloads/Anilife` when downloaded from the player and as cache
      * segments only the app can read when downloaded from its own title page — same button, same
      * setting, different result, and nothing on screen to say which one you were getting. The
      * destination is a preference about where downloads go, not about which screen started them.

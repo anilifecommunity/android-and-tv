@@ -2089,7 +2089,7 @@ fun SettingsScreen(
                 item(key = "Open episodes in external player") {
                     MidnightSettingSwitchRow(
                         title = "Open episodes in external player",
-                        description = "Skip Anilili's player and open another installed video app",
+                        description = "Skip Anilife's player and open another installed video app",
                         checked = openEpisodesInExternalPlayer,
                         onCheckedChange = SettingsStore::setOpenEpisodesInExternalPlayer,
                     )
@@ -2578,7 +2578,7 @@ fun SettingsScreen(
                     item {
                         MidnightInlineNotice(
                             "Discord's consent screen asks for more than this uses: it bundles " +
-                                "presence with friends-list and game-invite access. Anilili only " +
+                                "presence with friends-list and game-invite access. Anilife only " +
                                 "ever sets your activity.",
                             tone = MidnightNoticeTone.INFO,
                         )
@@ -3192,7 +3192,7 @@ fun SettingsScreen(
                         title = "Discord server",
                         description = "Questions, source problems and release news",
                         leading = { AboutBrandGlyph(R.drawable.ic_brand_discord) },
-                        onClick = { openLink(context, "https://discord.gg/Anilili") },
+                        onClick = { openLink(context, "https://github.com/anilifecommunity/android-and-tv/issues") },
                     )
                 }
                 item(key = "about-note") { AboutSignature() }
@@ -4057,7 +4057,7 @@ private fun AboutSignature() {
             .padding(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 8.dp),
     ) {
         Text(
-            text = "Anilili is a one-person project: an anime app that finds an episode across " +
+            text = "Anilife is a community project: an anime app that finds an episode across " +
                 "dozens of sources, remembers where you stopped, and keeps your list in step with " +
                 "AniList or MyAnimeList. No adverts, and no account of its own.",
             style = MaterialTheme.typography.bodyMedium,

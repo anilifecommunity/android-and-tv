@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * a remote control:
  *
  * - [PrimaryDownloads] is what every export used before this existed, and stays the default.
- * - [MediaStoreVolume] writes `Download/Anilili` on a removable volume the platform indexes. It
+ * - [MediaStoreVolume] writes `Download/Anilife` on a removable volume the platform indexes. It
  *   needs no permission at all and keeps the files visible to every other app, but MediaStore only
  *   admits secondary volumes from Android 10.
  * - [DocumentTree] is a folder the viewer picked in the system picker. It reaches anywhere —
@@ -39,7 +39,7 @@ sealed interface DownloadLocation {
     /** The form persisted in preferences; parsed back by [parseDownloadLocation]. */
     val storedValue: String
 
-    /** The primary volume's public `Downloads/Anilili`. */
+    /** The primary volume's public `Downloads/Anilife`. */
     data object PrimaryDownloads : DownloadLocation {
         override val storedValue: String = PRIMARY
     }
@@ -492,9 +492,9 @@ object DownloadLocations {
     }
 
     /**
-     * The disk without the folder on it — "SD card" where [label] gives "SD card/Anilili".
+     * The disk without the folder on it - "SD card" where [label] gives "SD card/Anilife".
      *
-     * Free space belongs to a volume rather than to a folder, and "40 GB free on SD card/Anilili"
+     * Free space belongs to a volume rather than to a folder, and "40 GB free on SD card/Anilife"
      * reads as though that folder had a quota of its own. Lower case because every use of it is
      * mid-sentence.
      */

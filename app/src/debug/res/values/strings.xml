@@ -5,5 +5,5 @@
     only ever opens the release app. A name of its own keeps the debug build findable.
 -->
 <resources>
-    <string name="app_name">Anilili Debug</string>
+    <string name="app_name">Anilife Debug</string>
 </resources>

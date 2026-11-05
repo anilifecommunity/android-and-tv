@@ -44,7 +44,7 @@ internal object DiscordActivityType {
 
 /**
  * Which activity field the member list and the status line read after "Watching": the app's name
- * (Discord's default, "Watching Anilili"), the `state` line, or the `details` line.
+ * (Discord's default, "Watching Anilife"), the `state` line, or the `details` line.
  */
 internal object DiscordStatusDisplayType {
     const val NAME = 0
@@ -58,8 +58,8 @@ private const val MAX_BUTTON_LABEL = 32
 private const val MAX_BUTTON_URL = 512
 
 /** The card's one button, which opens the project's Discord server (Settings > About's link). */
-internal const val WATCH_BUTTON_LABEL = "Get Anilili"
-internal const val WATCH_BUTTON_URL = "https://discord.gg/Anilili"
+internal const val WATCH_BUTTON_LABEL = "Get Anilife"
+internal const val WATCH_BUTTON_URL = "https://github.com/anilifecommunity/android-and-tv"
 
 /**
  * The keys the small-badge art was uploaded under in the developer portal.
@@ -98,7 +98,7 @@ internal fun buildPresencePayload(
         // A number rather than a string. Snowflakes are usually quoted in Discord's REST
         // payloads, but op 3 is the Social SDK's own path and the shape that is known to be
         // accepted there is the numeric one; an int64 survives it exactly.
-        .put("application_id", DiscordAuthManager.APPLICATION_ID.toLong())
+        .put("application_id", DiscordAuthManager.APPLICATION_ID.toLongOrNull() ?: 0L)
         .put("platform", "android")
 
     presenceText(watching.seriesTitle)?.let { series ->

@@ -332,7 +332,7 @@ internal object DownloadLocationFiles {
         return PublishedFile(target, displayName(context, target, DOCUMENT_PROJECTION) ?: fileName)
     }
 
-    /** The `Anilili/<series>` folder inside the picked tree, created if it is not there yet. */
+    /** The `Anilife/<series>` folder inside the picked tree, created if it is not there yet. */
     private fun requireSeriesDocument(
         context: Context,
         location: DownloadLocation.DocumentTree,

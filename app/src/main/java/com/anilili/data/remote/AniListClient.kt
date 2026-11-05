@@ -1468,7 +1468,7 @@ class AniListClient(
         private const val NEWEST_AIRED_BUFFER_SEC = 90L * 60
         private const val SAVED_SYNC_BATCH_SIZE = 10
         private const val CUSTOM_LIST_BATCH_SIZE = 10
-        private const val USER_AGENT = "Anilili/0.1.14 Android (AniList client 45552)"
+        private const val USER_AGENT = "Anilife Android"
 
         /**
          * What this client is, in the scheme Android itself uses for app-originated requests.
@@ -1477,7 +1477,7 @@ class AniListClient(
          * carries a `.debug` suffix, and the identity AniList sees should be the app, not which
          * copy of it happens to be running.
          */
-        private const val REFERER = "android-app://com.miruronative"
+        private const val REFERER = "android-app://io.github.anilifecommunity.anilife"
     }
 }
 

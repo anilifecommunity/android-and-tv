@@ -42,13 +42,13 @@ import okhttp3.WebSocketListener
  * The final guard is unchanged: Android only installs APKs signed by the release key.
  */
 object NostrUpdateSource {
-    const val MANIFEST_PUBKEY_HEX = "f1abd1ac685aed1f5145271283cd9418bf13aa92ed26399df191ae0c08b22207"
+    const val MANIFEST_PUBKEY_HEX = "dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c"
     const val MANIFEST_KIND = 30078
 
     /** Where the signed manifest is mirrored as a file; same event, one request instead of a relay scan. */
     const val MANIFEST_MIRROR_URL =
-        "https://huggingface.co/HF_USER/HF_REPO/resolve/main/latest/update.json"
-    const val MANIFEST_D_TAG = "anilili-update"
+        "https://github.com/anilifecommunity/android-and-tv/releases/latest/download/update.json"
+    const val MANIFEST_D_TAG = "anilife-update"
 
     private val RELAYS = listOf(
         "wss://relay.damus.io",
@@ -56,7 +56,7 @@ object NostrUpdateSource {
         "wss://relay.nostr.band",
         "wss://relay.primal.net",
     )
-    private const val SUBSCRIPTION_ID = "anilili-update"
+    private const val SUBSCRIPTION_ID = "anilife-update"
     private val PER_RELAY_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(10)
     private val OVERALL_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(15)
 

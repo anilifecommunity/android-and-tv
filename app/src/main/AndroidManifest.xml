@@ -10,7 +10,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Android 9 and earlier need legacy write access for Downloads/Anilili. The max SDK keeps
+    <!-- Android 9 and earlier need legacy write access for Downloads/Anilife. The max SDK keeps
          this broad permission completely out of Android 10+'s scoped-storage path. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
@@ -95,7 +95,7 @@
         </activity>
 
         <!--
-            `anilili://` links (anime, watch, search), the format both Anilili apps share. Forwarded
+            `anilife://` links (anime, watch, search), the Anilife public deep-link format. Forwarded
             to MainActivity, which reads them; see AnililiLinkActivity for why the filter is not on
             MainActivity itself. Both flavors get it, though a television has no browser to tap a
             link in: there it is reached by adb or another app.
@@ -111,7 +111,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="anilili" />
+                <data android:scheme="anilife" />
             </intent-filter>
         </activity>
 
@@ -132,7 +132,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="discord-1545324837306634250" />
+                <data android:scheme="${discordRedirectScheme}" />
             </intent-filter>
         </activity>
 

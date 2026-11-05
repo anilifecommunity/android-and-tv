@@ -200,12 +200,12 @@ class DiscordPresencePayloadTest {
     }
 
     @Test
-    fun `the button opens the Anilili Discord server`() {
+    fun `the button opens the Anilife project`() {
         val activity = payload(watching()).activity()
 
-        assertEquals("Get Anilili", activity.getJSONArray("buttons").getString(0))
+        assertEquals("Get Anilife", activity.getJSONArray("buttons").getString(0))
         assertEquals(
-            "https://discord.gg/Anilili",
+            "https://github.com/anilifecommunity/android-and-tv",
             activity.getJSONObject("metadata").getJSONArray("button_urls").getString(0),
         )
     }
@@ -216,7 +216,7 @@ class DiscordPresencePayloadTest {
 
         assertEquals(1, activity.getJSONArray("buttons").length())
         assertEquals(
-            "https://discord.gg/Anilili",
+            "https://github.com/anilifecommunity/android-and-tv",
             activity.getJSONObject("metadata").getJSONArray("button_urls").getString(0),
         )
     }
@@ -234,7 +234,7 @@ class DiscordPresencePayloadTest {
     fun `the application id is a number Discord can read back exactly`() {
         val activity = payload(watching()).activity()
 
-        assertEquals(DiscordAuthManager.APPLICATION_ID.toLong(), activity.getLong("application_id"))
+        assertEquals(DiscordAuthManager.APPLICATION_ID.toLongOrNull() ?: 0L, activity.getLong("application_id"))
     }
 
     @Test

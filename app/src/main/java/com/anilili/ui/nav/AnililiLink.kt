@@ -6,12 +6,12 @@ import java.net.URLEncoder
 import kotlin.math.floor
 
 /**
- * `anilili://` links, the format both Anilili apps open.
+ * `anilife://` links, the public format Anilife opens.
  *
  * ```text
- * anilili://anime/<anilist id>                        the title's page
- * anilili://watch/<anilist id>/<episode>[?t=<secs>]   play an episode, from `t` if given
- * anilili://search?q=<text>                           search
+ * anilife://anime/<anilist id>                        the title's page
+ * anilife://watch/<anilist id>/<episode>[?t=<secs>]   play an episode, from `t` if given
+ * anilife://search?q=<text>                           search
  * ```
  *
  * The desktop app defined the format (`../anilili-desktop/docs/LINKS.md`) and its reader is
@@ -53,7 +53,7 @@ sealed interface AnililiLink {
     }
 
     companion object {
-        const val SCHEME = "anilili"
+        const val SCHEME = "anilife"
 
         fun parse(text: String): AnililiLink? = (read(text) as? Reading.Read)?.link
 
@@ -69,7 +69,7 @@ sealed interface AnililiLink {
 
             val colon = link.indexOf(':')
             if (colon <= 0) return refuse("not a link")
-            if (!link.substring(0, colon).equals(SCHEME, ignoreCase = true)) return refuse("not an anilili:// link")
+            if (!link.substring(0, colon).equals(SCHEME, ignoreCase = true)) return refuse("not an anilife:// link")
             val rest = link.substring(colon + 1).substringBefore('#')
             val query = rest.substringAfter('?', missingDelimiterValue = "")
             var path = rest.substringBefore('?')
