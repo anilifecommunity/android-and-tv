@@ -12,7 +12,8 @@ the owner makes that separate decision.
 5. Download the candidate bundle: six APKs, CycloneDX SBOM, build-provenance and SBOM
    attestation bundles, signing-certificate record, and `SHA256SUMS`.
 6. Verify every checksum, APK signature, package ID, version, form factor, ABI, and min SDK on a
-   separate trusted machine. Verify the GitHub artifact attestations with `gh attestation verify`.
+   separate trusted machine. Confirm every APK has the protected release certificate fingerprint,
+   and verify the GitHub artifact attestations with `gh attestation verify`.
 7. Install and smoke-test the universal mobile and TV APKs, including API 22 or equivalent Fire OS
    coverage, account flows, playback, downloads, updates, backup import, and accessibility.
 
