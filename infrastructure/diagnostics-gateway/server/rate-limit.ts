@@ -1,6 +1,8 @@
 import { createHmac } from "node:crypto";
 import { MAX_REPORTS_PER_IP_HOUR } from "./config.js";
 
+const MAX_TRACKED_CLIENTS = 2_000;
+
 export class UploadRateLimitError extends Error {
   constructor() {
     super("Too many reports from this device; try again later");
@@ -21,9 +23,12 @@ export class UploadRateLimiter {
     if (active.length >= MAX_REPORTS_PER_IP_HOUR) throw new UploadRateLimitError();
     active.push(now);
     this.recent.set(key, active);
-    if (this.recent.size > 2_000) {
+    if (this.recent.size > MAX_TRACKED_CLIENTS) {
       for (const [client, timestamps] of this.recent) {
         if (timestamps.every((timestamp) => timestamp < cutoff)) this.recent.delete(client);
+      }
+      while (this.recent.size > MAX_TRACKED_CLIENTS) {
+        this.recent.delete(this.recent.keys().next().value!);
       }
     }
   }
@@ -38,6 +43,14 @@ export class AdminLoginLimiter {
     if (active.length >= 10) return false;
     active.push(now);
     this.recent.set(address, active);
+    if (this.recent.size > MAX_TRACKED_CLIENTS) {
+      for (const [client, timestamps] of this.recent) {
+        if (timestamps.every((timestamp) => timestamp < cutoff)) this.recent.delete(client);
+      }
+      while (this.recent.size > MAX_TRACKED_CLIENTS) {
+        this.recent.delete(this.recent.keys().next().value!);
+      }
+    }
     return true;
   }
 }
