@@ -14,6 +14,7 @@ No secret values belong in this document. Local Android identifiers go in the ig
 | `OPEN_SUBTITLES_API_KEY` | Extractable API consumer key | Optional | Restrict and monitor at the provider. |
 | `KARTOONS_ACCOUNT_TOKENS` | Extractable provider account tokens | Optional | Comma-separated; use only with explicit account-owner permission. |
 | `KARTOONS_TOKENS_MIRROR_URL` | Public refresh URL | Optional | JSON token mirror; blank disables remote refresh. |
+| `RIFT_FIREBASE_API_KEY` | Extractable Firebase Android API key | Optional | Must be authorised by the AnimeRift project owner; blank disables Rift. |
 
 Redirect names are recorded in the local template so provider-console configuration can be audited.
 The app's canonical custom scheme is `anilife://`.

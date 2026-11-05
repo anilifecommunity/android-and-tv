@@ -9,7 +9,7 @@ Status values are evidence-based: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED`, or `
 | A02 Failure matrix | TODO | Requires mock-server and updater failure fixtures. |
 | A10 Legacy usage removal | DONE | Legacy `UsagePing` implementation, startup hook and tests removed. |
 | A11 Community identity | IN PROGRESS | App ID, deep link, version, updater names and visible core identity migrated; device validation remains. |
-| A12 Embedded provider tokens | IN PROGRESS | Kartoons provider is retained; inherited shared tokens are replaced by blank local/mirror configuration pending authorised credentials. |
+| A12 Embedded provider tokens | IN PROGRESS | Kartoons and Rift are retained; inherited shared tokens/API key are replaced by blank configuration pending authorised credentials. |
 | A13 Community index | IN PROGRESS | Android points at the live `anilifecommunity/media-index` tree; degraded-mode validation remains. |
 | A14 OAuth registrations | IN PROGRESS | Required public IDs and redirect formats are present in the ignored local infrastructure file; device sign-in validation remains. |
 | A15 Security boundaries | TODO | Exported components, imports, backup and logs need targeted review. |

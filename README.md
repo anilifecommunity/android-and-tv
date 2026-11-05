@@ -62,6 +62,7 @@ file or equivalent Gradle/environment values:
 - `OPEN_SUBTITLES_API_KEY` (optional; extractable from the APK)
 - `KARTOONS_ACCOUNT_TOKENS` (optional; comma-separated and extractable from the APK)
 - `KARTOONS_TOKENS_MIRROR_URL` (optional authorised refresh document)
+- `RIFT_FIREBASE_API_KEY` (optional; authorised AnimeRift Android client key)
 - `TMDB_READ_TOKEN` (server-side Media Index work only; do not ship in Android)
 
 Do not add OAuth client secrets, Discord bot tokens, provider user credentials, APK signing
@@ -70,6 +71,8 @@ material, or update-signing private keys to source control.
 Kartoons is retained, including its Hindi provider ordering and token failover. The inherited shared
 account tokens are not recommitted because they are exposed credentials. A local build can enable
 the provider with accounts whose owners explicitly permit distribution; blank values fail closed.
+Rift is likewise retained, but its inherited third-party Firebase key is not distributed; an
+authorised replacement is required to enable that provider.
 
 ## Release artifacts
 

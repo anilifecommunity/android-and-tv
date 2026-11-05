@@ -41,6 +41,7 @@ val discordApplicationId = infrastructureValue("DISCORD_APPLICATION_ID", "discor
 val openSubtitlesApiKey = infrastructureValue("OPEN_SUBTITLES_API_KEY", "openSubtitlesApiKey")
 val kartoonsAccountTokens = infrastructureValue("KARTOONS_ACCOUNT_TOKENS", "kartoonsAccountTokens")
 val kartoonsTokensMirrorUrl = infrastructureValue("KARTOONS_TOKENS_MIRROR_URL", "kartoonsTokensMirrorUrl")
+val riftFirebaseApiKey = infrastructureValue("RIFT_FIREBASE_API_KEY", "riftFirebaseApiKey")
 
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("keystore.properties")
@@ -66,6 +67,7 @@ android {
         buildConfigField("String", "DISCORD_APPLICATION_ID", buildConfigString(discordApplicationId))
         buildConfigField("String", "KARTOONS_ACCOUNT_TOKENS", buildConfigString(kartoonsAccountTokens))
         buildConfigField("String", "KARTOONS_TOKENS_MIRROR_URL", buildConfigString(kartoonsTokensMirrorUrl))
+        buildConfigField("String", "RIFT_FIREBASE_API_KEY", buildConfigString(riftFirebaseApiKey))
         // Register a free API consumer at opensubtitles.com and provide its key through the
         // private Gradle user properties or OPEN_SUBTITLES_API_KEY. Never put it in this repo.
         buildConfigField("String", "OPEN_SUBTITLES_API_KEY", buildConfigString(openSubtitlesApiKey))
