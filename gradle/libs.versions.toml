@@ -8,7 +8,7 @@ composeBom = "2024.12.01"
 navigation = "2.8.5"
 # 1.9+ raises minSdk to 23. Keep the last API-22-compatible line for Fire OS 5.
 media3 = "1.8.1"
-playServicesCronet = "18.0.1"
+playServicesCronet = "18.1.1"
 fragment = "1.8.5"
 okhttp = "4.12.0"
 okio = "3.9.1"
