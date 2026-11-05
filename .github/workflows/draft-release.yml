@@ -17,7 +17,9 @@ on:
         type: string
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 concurrency:
   group: draft-release
@@ -92,6 +94,9 @@ jobs:
       - name: Build release APKs
         run: ./gradlew :app:assembleMobileRelease :app:assembleTvRelease --max-workers=2 --no-configuration-cache --console=plain
 
+      - name: Generate CycloneDX SBOM
+        run: ./gradlew :app:cyclonedxDirectBom --max-workers=2 --no-configuration-cache --console=plain
+
       - name: Verify and stage release assets
         shell: bash
         run: |
@@ -105,8 +110,37 @@ jobs:
             "$ANDROID_HOME/build-tools/35.0.1/zipalign" -c -P 16 4 "${matches[0]}"
             cp "${matches[0]}" "dist/$name"
           done
-          sha256sum dist/*.apk > dist/SHA256SUMS
+          cp app/build/reports/cyclonedx-direct/bom.json dist/Anilife.cdx.json
+          "$ANDROID_HOME/build-tools/35.0.1/apksigner" verify --print-certs dist/Anilife.apk |
+            grep -E 'Signer #1 certificate DN|Signer #1 certificate SHA-256 digest|Signer #1 public key algorithm|Signer #1 public key size' \
+            > dist/SIGNING-CERTIFICATE.txt
           printf '%s\n' "$RELEASE_NOTES" > release-notes.txt
+
+      - name: Attest build provenance
+        id: provenance
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: dist/*.apk
+
+      - name: Attest SBOM
+        id: sbom
+        uses: actions/attest-sbom@4651f806c01d8637787e274ac3bdf724ef169f34 # v3
+        with:
+          subject-path: dist/*.apk
+          sbom-path: dist/Anilife.cdx.json
+
+      - name: Stage attestations and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "${{ steps.provenance.outputs.bundle-path }}" dist/BUILD-PROVENANCE.intoto.jsonl
+          cp "${{ steps.sbom.outputs.bundle-path }}" dist/SBOM-ATTESTATION.intoto.jsonl
+          (
+            cd dist
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\0' |
+              sort -z |
+              xargs -0 sha256sum > SHA256SUMS
+          )
 
       - name: Create draft prerelease
         shell: bash
