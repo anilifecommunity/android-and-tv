@@ -143,7 +143,7 @@ So the challenge went from *unable to run* to *running and losing*. Ruled out si
   but a coherent 384×832 arm walled too.
 
 **Render throttling was the next real blocker, and it is also fixed.** The clipped-away tab produced
-**2–3 frames per second** because `LAYER_TYPE_SOFTWARE` — inherited from when this was a 1dp helper
+**2-3 frames per second** because `LAYER_TYPE_SOFTWARE`, retained from when this was a 1dp helper,
 — now meant repainting a 1080×2340 bitmap every frame. The layer was there to keep a *1dp* WebView
 off Chromium's SurfaceControl overlay path; there is no 1dp WebView any more, so it is gone and the
 tab runs on the hardware layer hidden as well as shown. Measured after: **~120fps**, and a

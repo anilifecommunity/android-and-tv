@@ -7,8 +7,8 @@ change to the icon is one edit followed by a re-run:
 
     python scripts/generate_icon_variants.py
 
-The canonical transparent mark lives at docs/assets/anilife-logo-transparent.png. White stays white
-and the mark's pink accent follows ThemeAccent in generated icon variants.
+The canonical transparent mark lives at docs/assets/anilife-logo-transparent.png. The supplied
+green artwork is the default; generated theme variants tint only its green light.
 """
 
 from pathlib import Path
@@ -56,11 +56,9 @@ def recolor(image: Image.Image, accent: int) -> Image.Image:
     rgb, alpha = rgba[..., :3], rgba[..., 3:]
     value = rgb.max(axis=-1, keepdims=True)
     color = np.array([(accent >> 16) & 0xFF, (accent >> 8) & 0xFF, accent & 0xFF], np.float32) / 255.0
-    # Pink has materially more red than green. Preserve the white strokes and recolour only that
-    # accent; the continuous blend keeps the source's anti-aliased pink/white edges intact.
-    pink = np.clip((rgb[..., 0:1] - rgb[..., 1:2]) * 4.0, 0.0, 1.0)
-    target = (1.0 - pink) + pink * color
-    out = np.concatenate([target * value, alpha], axis=-1)
+    # Keep the black silhouette and dark badge intact; only the green light follows the accent.
+    green = np.clip((rgb[..., 1:2] - np.maximum(rgb[..., 0:1], rgb[..., 2:3])) * 5.0, 0.0, 1.0)
+    out = np.concatenate([rgb * (1.0 - green) + color * value * green, alpha], axis=-1)
     return Image.fromarray((out * 255.0 + 0.5).astype(np.uint8), "RGBA")
 
 
@@ -97,25 +95,18 @@ def main() -> None:
         raise SystemExit(f"missing canonical logo: {MASTER}")
     source = np.asarray(Image.open(MASTER).convert("RGBA"))
     visible = source[..., 3] > 128
-    assert visible.any() and ((source[..., 0] - source[..., 1] > 40) & visible).any(), "logo must contain white and pink artwork"
+    assert visible.any() and ((source[..., 1] - source[..., 0] > 20) & visible).any(), "logo must contain green artwork"
 
     # Android guarantees only the central 66/108dp circle across adaptive-icon masks.
     foreground = mark(FOREGROUND_PX, 0.62)
     foreground.save(RES / "drawable" / "anilili_launcher.png", optimize=True)
-    mask = mark(512, 0.98)
-    alpha = mask.getchannel("A")
-    mask = Image.new("RGBA", mask.size, "white")
-    mask.putalpha(alpha)
-    mask.save(RES / "drawable-nodpi" / "anilife_logo_mask.png", optimize=True)
-    mask.save(ROOT / "docs" / "assets" / "logo-mask.png", optimize=True)
-
     icon = on_black(mark(1024))
     icon.save(ROOT / "docs" / "assets" / "icon.png", optimize=True)
     on_black(mark(320)).save(APP / "tv" / "res" / "drawable-nodpi" / "tv_launcher_icon.png", optimize=True)
     wordmark(546, 130, 120, 76).save(RES / "drawable-nodpi" / "anilili_header_wordmark.png", optimize=True)
-    banner = Image.new("RGBA", (320, 180), "#0B0B0F")
+    banner = Image.new("RGBA", (320, 180))
     banner.alpha_composite(wordmark(304, 120, 108, 43), (8, 30))
-    banner.convert("RGB").save(RES / "drawable-nodpi" / "tv_banner_art.png", optimize=True)
+    banner.save(RES / "drawable-nodpi" / "tv_banner_art.png", optimize=True)
 
     for density, size in DENSITY_SIZES.items():
         base = on_black(mark(size))

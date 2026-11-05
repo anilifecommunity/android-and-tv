@@ -1,0 +1,154 @@
+name: Publish signed update manifest
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag, for example v0.1.0-beta.1
+        required: true
+        type: string
+      channel:
+        description: Update channel
+        required: true
+        default: beta
+        type: choice
+        options:
+          - beta
+          - stable
+      important:
+        description: Prompt immediately for a same-version corrective build
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - mobile
+          - tv
+          - all
+      expires_in_days:
+        description: Manifest lifetime in days
+        required: true
+        default: "365"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-update-${{ inputs.channel }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      UPDATE_CHANNEL: ${{ inputs.channel }}
+      IMPORTANT: ${{ inputs.important }}
+      EXPIRES_IN_DAYS: ${{ inputs.expires_in_days }}
+      ANDROID_SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
+    steps:
+      - name: Check out publisher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: scripts/update-requirements.txt
+
+      - name: Validate published release and APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v0\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          [[ "$EXPIRES_IN_DAYS" =~ ^[1-9][0-9]*$ ]]
+          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          test "$(jq -r '.draft' <<<"$release_json")" = "false"
+          if [[ "$UPDATE_CHANNEL" = beta ]]; then
+            test "$(jq -r '.prerelease' <<<"$release_json")" = "true"
+            [[ "$RELEASE_TAG" = *-* ]]
+          else
+            test "$(jq -r '.prerelease' <<<"$release_json")" = "false"
+            [[ "$RELEASE_TAG" != *-* ]]
+          fi
+          mkdir release
+          gh release download "$RELEASE_TAG" --dir release
+          test -s release/Anilife.apk
+          test -s release/Anilife_tv.apk
+          test -s release/SHA256SUMS
+          (cd release && sha256sum --check SHA256SUMS)
+
+          mobile_package="$($ANDROID_HOME/build-tools/35.0.1/aapt dump badging release/Anilife.apk | head -n 1)"
+          tv_package="$($ANDROID_HOME/build-tools/35.0.1/aapt dump badging release/Anilife_tv.apk | head -n 1)"
+          app_version="$(sed -n "s/^package:.*versionName='\([^']*\)'.*/\1/p" <<<"$mobile_package")"
+          version_code="$(sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p" <<<"$mobile_package")"
+          test "$RELEASE_TAG" = "v$app_version"
+          grep -q "versionName='$app_version'" <<<"$tv_package"
+          grep -q "versionCode='$version_code'" <<<"$tv_package"
+          for apk in release/Anilife.apk release/Anilife_tv.apk; do
+            verify_output="$($ANDROID_HOME/build-tools/35.0.1/apksigner verify --verbose "$apk" 2>&1)" || {
+              printf '%s\n' "$verify_output"
+              exit 1
+            }
+            fingerprint="$($ANDROID_HOME/build-tools/35.0.1/apksigner verify --print-certs "$apk" |
+              sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+            test "${fingerprint,,}" = "${ANDROID_SIGNING_CERT_SHA256,,}"
+          done
+          {
+            echo "APP_VERSION=$app_version"
+            echo "VERSION_CODE=$version_code"
+            echo "MOBILE_SHA256=$(sha256sum release/Anilife.apk | cut -d' ' -f1)"
+            echo "TV_SHA256=$(sha256sum release/Anilife_tv.apk | cut -d' ' -f1)"
+            echo "MOBILE_SIZE=$(stat -c%s release/Anilife.apk)"
+            echo "TV_SIZE=$(stat -c%s release/Anilife_tv.apk)"
+          } >> "$GITHUB_ENV"
+          gh release view "$RELEASE_TAG" --json body --jq .body > release-notes.txt
+
+      - name: Sign canonical update manifest
+        shell: bash
+        env:
+          NOSTR_UPDATE_SECRET: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --require-hashes \
+            -r scripts/update-requirements.txt
+          args=(
+            publish
+            --version "$APP_VERSION"
+            --version-code "$VERSION_CODE"
+            --sequence "$VERSION_CODE"
+            --channel "$UPDATE_CHANNEL"
+            --expires-in-days "$EXPIRES_IN_DAYS"
+            --apk-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/Anilife.apk"
+            --apk-sha256 "$MOBILE_SHA256"
+            --size-bytes "$MOBILE_SIZE"
+            --tv-apk-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/Anilife_tv.apk"
+            --tv-apk-sha256 "$TV_SHA256"
+            --tv-size-bytes "$TV_SIZE"
+            --changelog "$(cat release-notes.txt)"
+            --write-event update.json
+            --dry-run
+          )
+          if [[ "$IMPORTANT" != none ]]; then
+            args+=(--important "$IMPORTANT")
+          fi
+          python scripts/nostr_update.py "${args[@]}"
+          jq -e '
+            .pubkey == "dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c" and
+            (.content | fromjson | .schema == 1)
+          ' update.json >/dev/null
+
+      - name: Mirror and broadcast the signed event
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" update.json --clobber
+          python scripts/nostr_update.py broadcast-file update.json

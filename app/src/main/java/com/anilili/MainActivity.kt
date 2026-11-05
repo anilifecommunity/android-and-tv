@@ -314,7 +314,7 @@ class MainActivity : FragmentActivity() {
                         launchSplashState.targetState = showLaunchSplash
                         // "Who's watching?" waits until the splash has finished leaving, not just
                         // started to: its dialog window draws above the activity, so opening it on
-                        // the exit put it over the last of the intro while the intro's sound played on.
+                        // the exit put it over the last of the intro.
                         val launchSplashGone = launchSplashState.isIdle && !launchSplashState.currentState
                         LaunchedEffect(launchSplashGone) {
                             if (launchSplashGone) com.anilili.ui.profiles.ProfilesUi.markLaunchIntroDone()
@@ -349,13 +349,12 @@ class MainActivity : FragmentActivity() {
                             // Over the app, under the intro: keeps Home out of sight between the
                             // intro leaving and "Who's watching?" drawing its own window.
                             com.anilili.ui.profiles.LaunchPickerCover()
-                            // The TV flavor's video intro can be turned off in Settings. Settings load
-                            // asynchronously, so the choice waits for them rather than starting one
-                            // intro and swapping to the other; the mobile flavor has only the mark.
+                            // The supplied startup animation can be turned off in Settings. Wait for
+                            // that choice rather than starting an animation and swapping it midway.
                             val videoIntro by produceState<Boolean?>(
                                 // A profile switch restarts the app; the viewer has just seen the
                                 // intro and is waiting on their profile, not on a second one.
-                                initialValue = if (BuildConfig.FLAVOR == "tv" && !profileSwitchLaunch) null else false,
+                                initialValue = if (!profileSwitchLaunch) null else false,
                             ) {
                                 if (value == null) {
                                     value = withTimeoutOrNull(LaunchIntroSettingsWaitMillis) {
@@ -439,7 +438,7 @@ class MainActivity : FragmentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // Volume stays live: the video intro plays with sound.
+        // Volume stays live while the startup animation has focus.
         val volume = event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
             event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
             event.keyCode == KeyEvent.KEYCODE_VOLUME_MUTE
@@ -1193,8 +1192,7 @@ private fun BoxScope.PipeHumanCheckBackdrop(isTv: Boolean, onDismiss: () -> Unit
 
 /** Frames to keep retrying the rail's initial focus on slow TV boxes before giving up. */
 /**
- * How long the TV launch waits for Settings before picking an intro. The read takes milliseconds;
- * past this the water-fill mark plays rather than keeping the screen blank.
+ * How long launch waits for Settings before falling back to the water-fill brand frame.
  */
 private const val LaunchIntroSettingsWaitMillis = 1_000L
 

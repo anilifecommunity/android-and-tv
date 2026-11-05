@@ -6,7 +6,7 @@ Every failure the app can show carries a code. Quote it in a bug report: it is t
 thing that survives a minified release build and can be matched against a diagnostics
 bundle, where the same code is the event name.
 
-A code may carry a second half — `PLAY-02/h403`. That is the underlying library's own
+A code may carry a second half, such as `PLAY-02/h403`. That is the underlying library's own
 error number, kept because it is more precise than anything this app invents:
 
 | Prefix | Source |
@@ -16,7 +16,7 @@ error number, kept because it is more precise than anything this app invents:
 | `x` | Media3 `ExportException.errorCode` |
 | `c` | `MediaCodec.CodecException.errorCode` |
 
-## Network — `NET`
+## Network: `NET`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -34,7 +34,7 @@ error number, kept because it is more precise than anything this app invents:
 | `NET-12` | Your network is blocking this server. Try another network or a VPN. | &mdash; |
 | `NET-13` | Couldn't pick a random anime. | Try again |
 
-## Sources — `SRC`
+## Sources: `SRC`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -48,7 +48,7 @@ error number, kept because it is more precise than anything this app invents:
 | `SRC-08` | No server offered a downloadable copy. | Try another server |
 | `SRC-09` | This server is limiting requests right now. | Try another server |
 
-## Playback — `PLAY`
+## Playback: `PLAY`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -63,7 +63,7 @@ error number, kept because it is more precise than anything this app invents:
 | `PLAY-09` | No app on this device can open a web page. | &mdash; |
 | `PLAY-10` | Your network is blocking this video server. | Try another server |
 
-## Subtitles — `SUB`
+## Subtitles: `SUB`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -77,7 +77,7 @@ error number, kept because it is more precise than anything this app invents:
 | `SUB-08` | No lines were found near that moment. | &mdash; |
 | `SUB-09` | Couldn't reach AniSkip. | Try again |
 
-## Downloads — `DL`
+## Downloads: `DL`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ error number, kept because it is more precise than anything this app invents:
 | `DL-05` | Couldn't save this episode's subtitles. | &mdash; |
 | `DL-06` | No app can open these download options. | &mdash; |
 
-## Saving to device — `EXP`
+## Saving to device: `EXP`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -104,7 +104,7 @@ error number, kept because it is more precise than anything this app invents:
 | `EXP-10` | The chosen save location isn't connected. | Open settings |
 | `EXP-11` | That download is no longer on this device. | &mdash; |
 
-## Accounts — `ACC`
+## Accounts: `ACC`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -121,7 +121,7 @@ error number, kept because it is more precise than anything this app invents:
 | `ACC-11` | Couldn't save your score on %s. | Try again |
 | `ACC-12` | Couldn't save your episode count on %s. | Try again |
 
-## Backup — `BAK`
+## Backup: `BAK`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -133,7 +133,7 @@ error number, kept because it is more precise than anything this app invents:
 | `BAK-06` | Nothing here can be exported. | &mdash; |
 | `BAK-07` | No file picker on this device. | &mdash; |
 
-## TV pairing — `PAIR`
+## TV pairing: `PAIR`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -147,7 +147,7 @@ error number, kept because it is more precise than anything this app invents:
 | `PAIR-08` | Nothing connected in time. | Try again |
 | `PAIR-09` | Pairing didn't complete. | Try again |
 
-## Updates — `UPD`
+## Updates: `UPD`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -158,7 +158,7 @@ error number, kept because it is more precise than anything this app invents:
 | `UPD-05` | This device refused to install the update. | &mdash; |
 | `UPD-06` | No installer on this device accepted the update. | &mdash; |
 
-## Diagnostics — `DIAG`
+## Diagnostics: `DIAG`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
@@ -166,13 +166,13 @@ error number, kept because it is more precise than anything this app invents:
 | `DIAG-02` | Couldn't read the selected screenshot. | Choose a file |
 | `DIAG-03` | Couldn't record diagnostics on this device. | &mdash; |
 
-## Links — `DLINK`
+## Links: `DLINK`
 
 | Code | What it means | Next step |
 | --- | --- | --- |
 | `DLINK-01` | That Anilife link isn't one this app understands. | &mdash; |
 
-## App — `APP`
+## App: `APP`
 
 | Code | What it means | Next step |
 | --- | --- | --- |

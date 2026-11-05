@@ -1,24 +1,18 @@
 package com.anilili.ui.components
 
-import androidx.compose.material3.Text
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import com.anilili.R
 
-/**
- * A rights-safe development wordmark until approved Anilife artwork is supplied.
- * The historical image asset is deliberately not rendered as new product branding.
- */
 @Composable
 fun AnililiWordmark(modifier: Modifier = Modifier) {
-    Text(
-        text = "ANILIFE",
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black),
-        maxLines = 1,
-        overflow = TextOverflow.Clip,
+    Image(
+        painter = painterResource(R.drawable.anilili_header_wordmark),
+        contentDescription = "Anilife",
+        contentScale = ContentScale.Fit,
         modifier = modifier,
     )
 }

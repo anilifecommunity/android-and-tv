@@ -40,7 +40,7 @@ class NostrManifestVerificationTest {
     @Test
     fun `the manifest parses into an installable update`() {
         val info = event().parseManifest(json)
-        assertEquals("0.1.0", info.version)
+        assertEquals("0.1.0-beta.1", info.version)
         assertTrue("apk must be fetched over TLS", info.apkUrl.startsWith("https://"))
         assertTrue("size should be populated", info.sizeBytes > 0)
     }
@@ -49,7 +49,7 @@ class NostrManifestVerificationTest {
     @Test
     fun `a legacy manifest still gives a TV something to install`() {
         val info = event().parseManifest(json, isTv = true)
-        assertEquals("0.1.0", info.version)
+        assertEquals("0.1.0-beta.1", info.version)
         assertTrue("falls back to the single apkUrl", info.apkUrl.endsWith("Anilife.apk"))
     }
 

@@ -204,14 +204,12 @@ internal fun settingsSearchEntries(isTv: Boolean): List<SettingsSearchEntry> = b
                     "keyboard", "lag", "slow", "live", "instant", "firestick", "fire tv",
                 ),
             )
-            if (BuildConfig.FLAVOR == "tv") {
-                add(
-                    "Video intro" to listOf(
-                        "intro", "video", "splash", "launch", "startup", "start up", "opening",
-                        "animation", "logo", "sound", "skip",
-                    ),
-                )
-            }
+            add(
+                "Startup animation" to listOf(
+                    "intro", "video", "splash", "launch", "startup", "start up", "opening",
+                    "animation", "logo", "skip",
+                ),
+            )
             add(
                 "Arrange Home" to listOf(
                     "home", "rows", "row", "order", "reorder", "arrange", "layout", "customize",
@@ -252,6 +250,7 @@ internal fun settingsSearchEntries(isTv: Boolean): List<SettingsSearchEntry> = b
         "app", "App",
         listOf(
             "Check for updates on launch" to listOf("update", "version", "upgrade"),
+            "Receive beta updates" to listOf("update", "beta", "preview", "tester"),
             "Send diagnostics" to listOf("diagnostics", "logs", "report", "bug"),
         ),
     )

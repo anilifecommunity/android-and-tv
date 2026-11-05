@@ -25,6 +25,7 @@ scripts/.venv/
 # Local/editor state
 .idea/
 .vscode/
+.private/
 
 # Generated or discarded project artifacts
 __pycache__/

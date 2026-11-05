@@ -1,0 +1,63 @@
+name: Beta feedback
+description: Report real-device results for an Anilife prerelease.
+title: "[Beta]: "
+labels: [beta, testing]
+body:
+  - type: checkboxes
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed tokens, cookies, private URLs, account identifiers, and personal data.
+          required: true
+  - type: input
+    id: build
+    attributes:
+      label: Anilife version and build
+      placeholder: 0.1.0-beta.1 (1)
+    validations:
+      required: true
+  - type: dropdown
+    id: apk
+    attributes:
+      label: APK
+      options:
+        - Anilife.apk
+        - Anilife_arm64-v8a.apk
+        - Anilife_armeabi-v7a.apk
+        - Anilife_tv.apk
+        - Anilife_tv_arm64-v8a.apk
+        - Anilife_tv_armeabi-v7a.apk
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android or Fire OS version
+      placeholder: Fire TV Stick 4K, Fire OS 8
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: What did you test?
+      options:
+        - label: Fresh install and launch
+        - label: Update from an earlier Anilife build
+        - label: Remote or touch navigation
+        - label: Account sign-in or sync
+        - label: Playback and subtitles
+        - label: Downloads or exports
+        - label: Backup export or import
+        - label: Accessibility or screen reader
+  - type: textarea
+    id: result
+    attributes:
+      label: Result
+      description: Describe what worked, what failed, and exact reproduction steps.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Optional redacted diagnostics
+      description: Attach only a report you explicitly generated and reviewed in Anilife.

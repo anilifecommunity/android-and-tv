@@ -24,3 +24,6 @@ incident without copying the secret into an issue or pull request.
 
 The Android application must not contain OAuth client secrets, Discord bot tokens, provider user
 accounts, the APK signing keystore, or the update-manifest private key.
+
+Maintainers should follow the [incident-response procedure](docs/security/incident-response.md) for
+credential exposure, signing concerns, or a vulnerable release.

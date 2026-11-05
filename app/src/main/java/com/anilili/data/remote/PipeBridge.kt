@@ -555,7 +555,6 @@ object PipeBridge {
         with(wv.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true
-            databaseEnabled = true
             allowFileAccess = false
             allowContentAccess = false
             // Deliberately NOT stripping the "; wv" token here, unlike the other two bridges.

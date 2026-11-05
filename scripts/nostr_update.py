@@ -16,8 +16,9 @@ The signing key is read from nostr-update-key.properties at the repo root
 
 Commands:
     keygen                                  Generate a new keypair (only if you must rotate!)
-    publish --version 0.1.56 --apk-url URL [--tv-apk-url URL] [--changelog TEXT]
-            [--size-bytes N] [--tv-size-bytes N] [--dry-run]
+    publish --version 0.1.56 --version-code 56 --apk-url URL --apk-sha256 HEX
+            [--tv-apk-url URL --tv-apk-sha256 HEX] [--channel stable|beta] [--dry-run]
+    broadcast-file EVENT.json               Broadcast an already signed event
     fetch                                   Show the manifest relays currently return
     announce --id ID --title T --message M [--url https://...] [--emergency]
              [--expires-in-days N] [--min-version V] [--max-version V] [--dry-run]
@@ -44,6 +45,7 @@ except ImportError:
 
 KIND = 30078
 D_TAG = "anilife-update"
+BETA_D_TAG = "anilife-update-beta"
 # Same key, same kind, different d-tag: relays keep the newest event per (pubkey, kind,
 # d-tag), so the announcement replaces itself without ever touching the manifest beside it.
 ANNOUNCE_D_TAG = "anilife-announcement"
@@ -135,8 +137,21 @@ def cmd_keygen(_args: argparse.Namespace) -> None:
     print(f"Bake this pubkey into NostrUpdateSource.MANIFEST_PUBKEY_HEX:\n  {sk.public_key_xonly.format().hex()}")
 
 
-def _variant(url: str, size_bytes: int | None, mirrors: list[str] | None = None) -> dict:
-    entry: dict = {"url": url}
+def _variant(
+    url: str,
+    size_bytes: int | None,
+    sha256: str,
+    form_factor: str,
+    version_code: int,
+    mirrors: list[str] | None = None,
+) -> dict:
+    entry: dict = {
+        "url": url,
+        "sha256": sha256.lower(),
+        "formFactor": form_factor,
+        "versionCode": version_code,
+        "abis": ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"],
+    }
     if size_bytes is not None:
         entry["sizeBytes"] = size_bytes
     # Alternative hosts for the same file, tried in order after `url`. A release otherwise lives
@@ -151,25 +166,57 @@ def _variant(url: str, size_bytes: int | None, mirrors: list[str] | None = None)
 def cmd_publish(args: argparse.Namespace) -> None:
     # --apk-url stays the phone build: every install published before the mobile/TV flavor split
     # reads only this field, and pointing it at a TV APK would push the wrong build to phones.
-    manifest = {"version": args.version, "changelog": args.changelog or "", "apkUrl": args.apk_url}
+    if len(args.apk_sha256) != 64 or any(c not in "0123456789abcdefABCDEF" for c in args.apk_sha256):
+        sys.exit("--apk-sha256 must be exactly 64 hexadecimal characters")
+    if args.version_code <= 0:
+        sys.exit("--version-code must be positive")
+    sequence = args.sequence if args.sequence is not None else args.version_code
+    if sequence <= 0:
+        sys.exit("--sequence must be positive")
+    if args.expires_in_days <= 0:
+        sys.exit("--expires-in-days must be positive")
+    if args.tv_apk_url and not args.tv_apk_sha256:
+        sys.exit("--tv-apk-sha256 is required with --tv-apk-url")
+    if args.tv_apk_sha256 and (
+        len(args.tv_apk_sha256) != 64
+        or any(c not in "0123456789abcdefABCDEF" for c in args.tv_apk_sha256)
+    ):
+        sys.exit("--tv-apk-sha256 must be exactly 64 hexadecimal characters")
+    expires_at = int(time.time()) + args.expires_in_days * 86400
+    manifest = {
+        "schema": 1,
+        "version": args.version,
+        "versionCode": args.version_code,
+        "sequence": sequence,
+        "expiresAt": expires_at,
+        "changelog": args.changelog or "",
+        "apkUrl": args.apk_url,
+        "sha256": args.apk_sha256.lower(),
+        "formFactor": "mobile",
+        "abis": ["arm64-v8a", "armeabi-v7a", "x86", "x86_64"],
+    }
     if args.size_bytes is not None:
         manifest["sizeBytes"] = args.size_bytes
-    # The internal build number (versionCode). Apps that read it treat a higher number under the
-    # same version name as a rebuild worth offering; older apps ignore it and compare names.
-    if args.version_code is not None:
-        manifest["versionCode"] = args.version_code
-    else:
-        print(
-            "WARNING: no --version-code given. A rebuild published under this same version name "
-            "will not be offered to installs that already have it.",
-            file=sys.stderr,
-        )
     # Newer apps read "variants" and pick by form factor; older ones ignore it and use apkUrl.
     variants = {}
     if args.apk_url:
-        variants["mobile"] = _variant(args.apk_url, args.size_bytes, args.apk_mirror)
+        variants["mobile"] = _variant(
+            args.apk_url,
+            args.size_bytes,
+            args.apk_sha256,
+            "mobile",
+            args.version_code,
+            args.apk_mirror,
+        )
     if args.tv_apk_url:
-        variants["tv"] = _variant(args.tv_apk_url, args.tv_size_bytes, args.tv_apk_mirror)
+        variants["tv"] = _variant(
+            args.tv_apk_url,
+            args.tv_size_bytes,
+            args.tv_apk_sha256,
+            "tv",
+            args.version_code,
+            args.tv_apk_mirror,
+        )
     # A rebuild worth interrupting for: apps from this field on pop it up like a new version
     # instead of waiting in Settings. Per form factor, since TVs are the ones that never look.
     # A new version pops up anyway; older apps ignore the field.
@@ -188,7 +235,8 @@ def cmd_publish(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
     content = json.dumps(manifest, separators=(",", ":"), ensure_ascii=False)
-    event = sign_event(PrivateKey(bytes.fromhex(load_secret_hex())), content)
+    d_tag = BETA_D_TAG if args.channel == "beta" else D_TAG
+    event = sign_event(PrivateKey(bytes.fromhex(load_secret_hex())), content, d_tag=d_tag)
     if not verify_event(event):
         sys.exit("Internal error: freshly signed event failed verification")
     print(json.dumps(event, indent=2))
@@ -201,6 +249,13 @@ def cmd_publish(args: argparse.Namespace) -> None:
     if args.dry_run:
         print("Dry run — not published.")
         return
+    broadcast(event)
+
+
+def cmd_broadcast_file(args: argparse.Namespace) -> None:
+    event = json.loads(Path(args.event).read_text(encoding="utf-8"))
+    if not verify_event(event):
+        sys.exit("Signed event failed verification")
     broadcast(event)
 
 
@@ -290,14 +345,19 @@ def cmd_announce_fetch(_args: argparse.Namespace) -> None:
     print(json.dumps(json.loads(newest["content"]), indent=2))
 
 
-def cmd_fetch(_args: argparse.Namespace) -> None:
+def cmd_fetch(args: argparse.Namespace) -> None:
     pubkey = load_public_hex()
     if not pubkey:
         sys.exit(f"publicKeyHex not found in {KEY_FILE}")
     request = json.dumps([
         "REQ",
         "anilife-update-check",
-        {"kinds": [KIND], "authors": [pubkey], "#d": [D_TAG], "limit": 3},
+        {
+            "kinds": [KIND],
+            "authors": [pubkey],
+            "#d": [BETA_D_TAG if args.channel == "beta" else D_TAG],
+            "limit": 3,
+        },
     ])
     events: list[dict] = []
 
@@ -337,16 +397,20 @@ def broadcast(event: dict) -> None:
     import websocket
 
     message = json.dumps(["EVENT", event])
+    accepted = 0
     for relay in RELAYS:
         try:
             ws = websocket.create_connection(relay, timeout=10)
             ws.send(message)
             reply = json.loads(ws.recv())
             ok = reply[0] == "OK" and reply[2] is True
+            accepted += int(ok)
             print(f"  {relay}: {'accepted' if ok else f'rejected: {reply}'}")
             ws.close()
         except Exception as error:  # noqa: BLE001
             print(f"  {relay}: {error}")
+    if accepted == 0:
+        sys.exit("No relay accepted the signed event")
 
 
 def main() -> None:
@@ -358,15 +422,17 @@ def main() -> None:
     publish = commands.add_parser("publish", help="sign and broadcast a new update manifest")
     publish.add_argument("--version", required=True, help="e.g. 0.1.54 — must sort newer than the installed version")
     publish.add_argument("--apk-url", required=True, help="direct download URL of the APK asset")
+    publish.add_argument("--apk-sha256", required=True, help="SHA-256 of the phone APK")
     publish.add_argument("--changelog", default="", help="release notes text")
     publish.add_argument("--size-bytes", type=int, default=None, help="APK size; used only for progress display")
     publish.add_argument(
         "--version-code",
         type=int,
-        default=None,
+        required=True,
         help="the build's versionCode; lets a same-version rebuild reach installs that have the version",
     )
     publish.add_argument("--tv-apk-url", default=None, help="direct download URL of the Android TV APK (Anilife_tv.apk)")
+    publish.add_argument("--tv-apk-sha256", default=None, help="SHA-256 of the Android TV APK")
     publish.add_argument("--tv-size-bytes", type=int, default=None, help="TV APK size; used only for progress display")
     publish.add_argument(
         "--apk-mirror",
@@ -386,6 +452,9 @@ def main() -> None:
         default=None,
         help="pop this rebuild up on launch for tv, mobile or all installs instead of offering it quietly",
     )
+    publish.add_argument("--channel", choices=["stable", "beta"], default="stable")
+    publish.add_argument("--sequence", type=int, default=None, help="monotonic manifest sequence; defaults to versionCode")
+    publish.add_argument("--expires-in-days", type=int, default=365)
     publish.add_argument("--dry-run", action="store_true", help="print the signed event without broadcasting")
     publish.add_argument(
         "--write-event",
@@ -394,7 +463,13 @@ def main() -> None:
     )
     publish.set_defaults(func=cmd_publish)
 
-    commands.add_parser("fetch", help="show the manifest relays currently return").set_defaults(func=cmd_fetch)
+    fetch = commands.add_parser("fetch", help="show the manifest relays currently return")
+    fetch.add_argument("--channel", choices=["stable", "beta"], default="stable")
+    fetch.set_defaults(func=cmd_fetch)
+
+    broadcast_file = commands.add_parser("broadcast-file", help="broadcast an already signed event")
+    broadcast_file.add_argument("event")
+    broadcast_file.set_defaults(func=cmd_broadcast_file)
 
     announce = commands.add_parser("announce", help="push a signed message to every install")
     announce.add_argument("--id", required=True, help="stable id; re-using it corrects the message silently, a new one re-notifies")

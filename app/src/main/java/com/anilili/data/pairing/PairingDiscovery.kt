@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
+import android.os.Build
 import com.anilili.diagnostics.DiagnosticsLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -165,7 +166,12 @@ internal class PairingBrowser(
                 scope.launch {
                     val resolved = resolveLock.withLock { resolve(info, name) }
                     if (resolved == null) return@launch
-                    val host = resolved.host?.hostAddress
+                    val host = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        resolved.hostAddresses.firstOrNull()?.hostAddress
+                    } else {
+                        @Suppress("DEPRECATION")
+                        resolved.host?.hostAddress
+                    }
                     if (host.isNullOrBlank()) {
                         // Resolving without an address happens on some stacks and would otherwise
                         // drop the TV from the list with no explanation at all.

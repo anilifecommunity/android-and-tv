@@ -1488,7 +1488,10 @@ private fun WatchContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        com.anilili.ui.components.WaterFillLogoIndicator(size = 72.dp)
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(44.dp),
+                            strokeWidth = 3.dp,
+                        )
                         Text(
                             text = data.seriesTitle,
                             style = MaterialTheme.typography.titleMedium,

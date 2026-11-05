@@ -17,12 +17,25 @@ class AppColorSchemeTest {
     private fun colors(spec: ThemeSpec) = appColors(spec, wallpaperSeed = null)
 
     @Test
-    fun `the default is AMOLED black and monochrome`() {
+    fun `the default matches the black and green Anilife brand`() {
         val scheme = colors(ThemeSpec()).scheme
         assertEquals(Color.Black, scheme.background)
         assertEquals(Color.Black, scheme.surface)
-        assertEquals(Color.White, scheme.primary)
+        assertEquals(Color(ThemeAccent.ANILIFE_GREEN.seed!!), scheme.primary)
         assertTrue(scheme.onPrimary.luminance() < 0.1f)
+    }
+
+    @Test
+    fun `legacy Midnight remains the original monochrome palette`() {
+        val scheme = colors(
+            ThemeSpec(
+                background = ThemePreset.MIDNIGHT.background,
+                accent = ThemePreset.MIDNIGHT.accent,
+                style = ThemePreset.MIDNIGHT.style,
+            ),
+        ).scheme
+        assertEquals(Color.Black, scheme.background)
+        assertEquals(Color.White, scheme.primary)
     }
 
     @Test
