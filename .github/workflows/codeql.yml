@@ -73,7 +73,13 @@ jobs:
         if: matrix.build-mode == 'manual'
         run: ./gradlew :app:assembleMobileDebug :app:assembleTvDebug --max-workers=2 --no-configuration-cache --console=plain
 
+      - name: Stop Gradle daemon
+        if: matrix.build-mode == 'manual'
+        run: ./gradlew --stop
+
       - name: Analyze
         uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: /language:${{ matrix.language }}
+          ram: 8192
+          threads: 2
