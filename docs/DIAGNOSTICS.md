@@ -1,8 +1,8 @@
 # Diagnostics and privacy
 
-Anilili creates a diagnostic report only when a user chooses **Send diagnostics** or approves the
+Anilife creates a diagnostic report only when a user chooses **Send diagnostics** or approves the
 crash-report prompt. The app then opens Android's share sheet; the user chooses whether and where
-to send the ZIP. Anilili has no background diagnostics uploader or private report service.
+to send the ZIP. Anilife has no background diagnostics uploader or private report service.
 
 Manual reports ask the user to describe the problem. A JPEG, PNG or WebP screenshot up to 5 MB can
 also be selected explicitly; it is never captured automatically. The description and screenshot
