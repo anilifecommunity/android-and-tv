@@ -64,6 +64,30 @@ internal fun nextLocalMidnightDelayMillis(now: ZonedDateTime): Long = Duration.b
 internal fun diagnosticsUploadShouldCatchUp(lastSuccessfulDate: String?, today: LocalDate): Boolean =
     lastSuccessfulDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }?.isBefore(today) == true
 
+internal enum class DiagnosticsReceiptDecision { ACCEPT, RETRY, DROP }
+
+internal fun diagnosticsReceiptDecision(status: Int, receiptValid: Boolean): DiagnosticsReceiptDecision = when {
+    status in 200..299 && receiptValid -> DiagnosticsReceiptDecision.ACCEPT
+    status in 200..299 || diagnosticsUploadIsRetryable(status) -> DiagnosticsReceiptDecision.RETRY
+    else -> DiagnosticsReceiptDecision.DROP
+}
+
+internal fun diagnosticsUploadShouldProceed(
+    automaticOnly: Boolean,
+    stagedAutomatic: Boolean,
+    automaticEnabled: Boolean,
+): Boolean = automaticEnabled || (!automaticOnly && !stagedAutomatic)
+
+internal fun diagnosticsTriggerIsAutomatic(trigger: DiagnosticTrigger): Boolean =
+    trigger == DiagnosticTrigger.DAILY
+
+internal val diagnosticsExistingWorkPolicy = ExistingWorkPolicy.REPLACE
+
+private val diagnosticsUploadMutex = Mutex()
+
+internal suspend fun <T> withDiagnosticsUploadLock(block: suspend () -> T): T =
+    diagnosticsUploadMutex.withLock { block() }
+
 private enum class UploadOutcome { SUCCESS, RETRY }
 
 // Consent and retry metadata must reach disk before work is scheduled or staged files are removed.
@@ -83,8 +107,7 @@ object DiagnosticsUploadManager {
     private const val WORK_TAG = "diagnostics-upload"
     private const val STAGING_DIRECTORY = "diagnostic_uploads"
 
-    private val uploadMutex = Mutex()
-    @Volatile private var activeCall: Call? = null
+    @Volatile private var activeUpload: ActiveUpload? = null
     private val timestamp = DateTimeFormatter.ofPattern(
         "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
         Locale.US,
@@ -139,7 +162,7 @@ object DiagnosticsUploadManager {
                 .remove(KEY_PENDING_TRIGGER)
                 .commit()
             _automatic.value = false
-            activeCall?.cancel()
+            activeUpload?.takeIf(ActiveUpload::automatic)?.call?.cancel()
             WorkManager.getInstance(app).cancelUniqueWork(WORK_NAME)
             stagingDirectory(app).deleteRecursively()
             setStatus(app, "Automatic diagnostics disabled; queued uploads deleted")
@@ -172,59 +195,100 @@ object DiagnosticsUploadManager {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
             .addTag(WORK_TAG)
             .build()
-        WorkManager.getInstance(app).enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.REPLACE, request)
+        WorkManager.getInstance(app).enqueueUniqueWork(WORK_NAME, diagnosticsExistingWorkPolicy, request)
     }
 
     private suspend fun performUpload(
         context: Context,
         requestedTrigger: DiagnosticTrigger,
         automaticOnly: Boolean,
-    ): UploadOutcome = uploadMutex.withLock {
+    ): UploadOutcome = withDiagnosticsUploadLock {
         val endpoint = origin() ?: run {
             setStatus(context, "Diagnostics upload is unavailable in this build")
-            return@withLock UploadOutcome.SUCCESS
+            return@withDiagnosticsUploadLock UploadOutcome.SUCCESS
         }
         val preferences = preferences(context)
-        if (automaticOnly && !preferences.getBoolean(KEY_ENABLED, false)) {
+        if (!diagnosticsUploadShouldProceed(
+                automaticOnly = automaticOnly,
+                stagedAutomatic = false,
+                automaticEnabled = preferences.getBoolean(KEY_ENABLED, false),
+            )
+        ) {
             discardPending(context, preferences)
-            return@withLock UploadOutcome.SUCCESS
+            return@withDiagnosticsUploadLock UploadOutcome.SUCCESS
         }
 
         val staged = stagedReport(context, preferences, requestedTrigger)
-        if (automaticOnly && !preferences.getBoolean(KEY_ENABLED, false)) {
-            discardPending(context, preferences)
-            return@withLock UploadOutcome.SUCCESS
-        }
         setStatus(context, "Uploading redacted diagnostics…")
-        if (staged.automatic && !preferences.getBoolean(KEY_ENABLED, false)) {
+        if (!diagnosticsUploadShouldProceed(
+                automaticOnly = automaticOnly,
+                stagedAutomatic = staged.automatic,
+                automaticEnabled = preferences.getBoolean(KEY_ENABLED, false),
+            )
+        ) {
             discardPending(context, preferences)
-            return@withLock UploadOutcome.SUCCESS
+            return@withDiagnosticsUploadLock UploadOutcome.SUCCESS
         }
+        DiagnosticsLog.event(
+            "diagnostics",
+            "upload.started",
+            mapOf("trigger" to staged.trigger.logValue),
+            outcome = "started",
+            operationId = staged.reportId,
+        )
         val call = AppGraph.httpClient.newCall(uploadRequest(context, endpoint, staged))
-        activeCall = call
+        activeUpload = ActiveUpload(call, staged.automatic)
         val response = try {
             call.execute()
         } catch (_: IOException) {
+            if (!diagnosticsUploadShouldProceed(
+                    automaticOnly = automaticOnly,
+                    stagedAutomatic = staged.automatic,
+                    automaticEnabled = preferences.getBoolean(KEY_ENABLED, false),
+                )
+            ) {
+                discardPending(context, preferences)
+                return@withDiagnosticsUploadLock UploadOutcome.SUCCESS
+            }
             setStatus(context, "Diagnostics upload queued for retry")
-            return@withLock UploadOutcome.RETRY
+            DiagnosticsLog.event(
+                "diagnostics",
+                "upload.deferred",
+                mapOf("trigger" to staged.trigger.logValue),
+                outcome = "retry",
+                operationId = staged.reportId,
+            )
+            return@withDiagnosticsUploadLock UploadOutcome.RETRY
         } finally {
-            activeCall = null
+            activeUpload = null
         }
         response.use {
             val body = it.body?.string().orEmpty().take(4_096)
-            if (it.isSuccessful && receiptIsValid(body, staged.reportId)) {
-                completePending(context, preferences, staged, advanceWatermark = staged.automatic)
-                setStatus(context, "Uploaded ${staged.reportId}; retained privately for 30 days")
-                DiagnosticsLog.event(
-                    "diagnostics",
-                    "upload.accepted",
-                    mapOf("trigger" to staged.trigger.logValue, "bytes" to staged.file.length()),
-                )
-                return@withLock UploadOutcome.SUCCESS
-            }
-            if (it.isSuccessful || diagnosticsUploadIsRetryable(it.code)) {
-                setStatus(context, "Diagnostics upload queued for retry")
-                return@withLock UploadOutcome.RETRY
+            when (diagnosticsReceiptDecision(it.code, receiptIsValid(body, staged.reportId))) {
+                DiagnosticsReceiptDecision.ACCEPT -> {
+                    completePending(context, preferences, staged, advanceWatermark = staged.automatic)
+                    setStatus(context, "Uploaded ${staged.reportId}; retained privately for 30 days")
+                    DiagnosticsLog.event(
+                        "diagnostics",
+                        "upload.accepted",
+                        mapOf("trigger" to staged.trigger.logValue, "bytes" to staged.file.length()),
+                        outcome = "success",
+                        operationId = staged.reportId,
+                    )
+                    return@withDiagnosticsUploadLock UploadOutcome.SUCCESS
+                }
+                DiagnosticsReceiptDecision.RETRY -> {
+                    setStatus(context, "Diagnostics upload queued for retry")
+                    DiagnosticsLog.event(
+                        "diagnostics",
+                        "upload.deferred",
+                        mapOf("status" to it.code, "trigger" to staged.trigger.logValue),
+                        outcome = "retry",
+                        operationId = staged.reportId,
+                    )
+                    return@withDiagnosticsUploadLock UploadOutcome.RETRY
+                }
+                DiagnosticsReceiptDecision.DROP -> Unit
             }
             completePending(context, preferences, staged, advanceWatermark = staged.automatic)
             setStatus(context, "Diagnostics upload was rejected (${it.code})")
@@ -232,6 +296,8 @@ object DiagnosticsUploadManager {
                 "diagnostics",
                 "upload.rejected",
                 mapOf("status" to it.code, "trigger" to staged.trigger.logValue),
+                outcome = "failure",
+                operationId = staged.reportId,
             )
             UploadOutcome.SUCCESS
         }
@@ -253,11 +319,11 @@ object DiagnosticsUploadManager {
                 file = pendingFile,
                 endUtc = preferences.getString(KEY_PENDING_END, null) ?: nowUtc(),
                 trigger = trigger,
-                automatic = preferences.getBoolean(KEY_ENABLED, false),
+                automatic = diagnosticsTriggerIsAutomatic(trigger),
             )
         }
         discardPending(context, preferences)
-        val automatic = preferences.getBoolean(KEY_ENABLED, false)
+        val automatic = diagnosticsTriggerIsAutomatic(requestedTrigger)
         val endUtc = nowUtc()
         val reportId = newReportId()
         val snapshot = DiagnosticsLog.createShareSnapshot(
@@ -360,6 +426,8 @@ object DiagnosticsUploadManager {
         val trigger: DiagnosticTrigger,
         val automatic: Boolean,
     )
+
+    private data class ActiveUpload(val call: Call, val automatic: Boolean)
 }
 
 class DiagnosticsUploadWorker(

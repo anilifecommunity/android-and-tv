@@ -5,6 +5,8 @@ import java.net.URI
 /** Central privacy boundary for every diagnostic sink and exported report. */
 internal object DiagnosticRedactor {
     private const val REDACTED = "<redacted>"
+    private const val MAX_ATTRIBUTES = 48
+    private const val MAX_ATTRIBUTE_VALUE = 512
 
     private val urlPattern = Regex("(?i)\\b(?:https?|wss?)://[^\\s\\]})>,\"']+")
     private val bearerPattern = Regex("(?i)\\bBearer\\s+[A-Za-z0-9._~+\\-/]+=*")
@@ -22,6 +24,8 @@ internal object DiagnosticRedactor {
         "(?i)^(authorization|cookie|set-cookie|access[_-]?token|refresh[_-]?token|token|" +
             "password|passwd|secret|query|title|slug|url|uri|referer|mediaId|data|body)$",
     )
+    private val attributeKey = Regex("^[A-Za-z][A-Za-z0-9_.-]{0,63}$")
+    private val correlationValue = Regex("^[A-Za-z0-9_-]{1,64}$")
 
     fun redactText(value: String): String {
         var redacted = value
@@ -45,11 +49,22 @@ internal object DiagnosticRedactor {
     }
 
     fun redactAttributes(attributes: Map<String, Any?>): Map<String, String> = attributes
-        .mapValues { (key, value) ->
-            if (sensitiveKeys.matches(key)) REDACTED else redactText(value?.toString() ?: "null")
+        .asSequence()
+        .filter { (key, _) -> attributeKey.matches(key) }
+        .take(MAX_ATTRIBUTES)
+        .associate { (key, value) ->
+            key to if (sensitiveKeys.matches(key)) {
+                REDACTED
+            } else {
+                redactText(value?.toString() ?: "null").take(MAX_ATTRIBUTE_VALUE)
+            }
         }
 
     fun redact(event: DiagnosticEvent): DiagnosticEvent = event.copy(
+        outcome = event.outcome?.let(::boundedLabel),
+        operationId = event.operationId?.takeIf(correlationValue::matches),
+        traceId = event.traceId?.takeIf(correlationValue::matches),
+        spanId = event.spanId?.takeIf(correlationValue::matches),
         message = event.message?.let(::redactText),
         attributes = redactAttributes(event.attributes),
         exception = event.exception?.let { exception ->
@@ -59,6 +74,11 @@ internal object DiagnosticRedactor {
             )
         },
     )
+
+    private fun boundedLabel(value: String): String = value
+        .lowercase()
+        .replace(Regex("[^a-z0-9_.-]"), "_")
+        .take(32)
 
     private fun redactUrl(raw: String): String = runCatching {
         val uri = URI(raw)

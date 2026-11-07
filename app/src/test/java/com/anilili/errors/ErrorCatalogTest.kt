@@ -131,7 +131,7 @@ internal fun renderErrorCodeTable(): String = buildString {
     appendLine("thing that survives a minified release build and can be matched against a diagnostics")
     appendLine("bundle, where the same code is the event name.")
     appendLine()
-    appendLine("A code may carry a second half — `PLAY-02/h403`. That is the underlying library's own")
+    appendLine("A code may carry a second half: `PLAY-02/h403`. That is the underlying library's own")
     appendLine("error number, kept because it is more precise than anything this app invents:")
     appendLine()
     appendLine("| Prefix | Source |")
@@ -144,7 +144,7 @@ internal fun renderErrorCodeTable(): String = buildString {
         val entries = AnililiError.entries.filter { it.domain == domain }.sortedBy { it.number }
         if (entries.isEmpty()) return@forEach
         appendLine()
-        appendLine("## ${domain.label} — `${domain.prefix}`")
+        appendLine("## ${domain.label}: `${domain.prefix}`")
         appendLine()
         appendLine("| Code | What it means | Next step |")
         appendLine("| --- | --- | --- |")

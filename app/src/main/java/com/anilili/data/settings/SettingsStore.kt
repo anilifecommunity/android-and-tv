@@ -211,6 +211,16 @@ enum class AppLayoutMode(val storedValue: String, val label: String) {
     }
 }
 
+enum class DiagnosticDetail(val storedValue: String, val label: String) {
+    STANDARD("standard", "Standard"),
+    ENHANCED("enhanced", "Enhanced");
+
+    companion object {
+        fun fromStored(value: String?): DiagnosticDetail =
+            entries.firstOrNull { it.storedValue == value } ?: STANDARD
+    }
+}
+
 /**
  * Which dub to take when a stream carries several, as many multi-audio sources do.
  *
@@ -984,6 +994,9 @@ object SettingsStore {
     private val _receiveBetaUpdates = MutableStateFlow(false)
     val receiveBetaUpdates = _receiveBetaUpdates.asStateFlow()
 
+    private val _diagnosticDetail = MutableStateFlow(DiagnosticDetail.STANDARD)
+    val diagnosticDetail = _diagnosticDetail.asStateFlow()
+
     /**
      * Pins the top bar and the bottom navigation on screen instead of letting a scroll tuck them
      * away. Off by default, which keeps the roomier YouTube-style behaviour; on for anyone who
@@ -1410,6 +1423,12 @@ object SettingsStore {
 
     fun setUpdateCheckOnLaunch(value: Boolean) = save(UPDATE_CHECK_ON_LAUNCH, value, _updateCheckOnLaunch)
     fun setReceiveBetaUpdates(value: Boolean) = save(RECEIVE_BETA_UPDATES, value, _receiveBetaUpdates)
+
+    fun setDiagnosticDetail(value: DiagnosticDetail) {
+        _diagnosticDetail.value = value
+        DiagnosticsLog.setCaptureMode(value.storedValue)
+        scope.launch { store.edit { it[DIAGNOSTIC_DETAIL] = value.storedValue } }
+    }
     fun setStaticAppChrome(value: Boolean) = save(STATIC_APP_CHROME, value, _staticAppChrome)
     fun setGlass(section: GlassSection, value: Boolean) =
         save(GLASS_KEYS.getValue(section), value, _glass.getValue(section))
@@ -2055,6 +2074,9 @@ object SettingsStore {
         _subtitlesByDefault.value = prefs[SUBTITLES_BY_DEFAULT] ?: true
         _updateCheckOnLaunch.value = prefs[UPDATE_CHECK_ON_LAUNCH] ?: true
         _receiveBetaUpdates.value = prefs[RECEIVE_BETA_UPDATES] ?: false
+        _diagnosticDetail.value = DiagnosticDetail.fromStored(prefs[DIAGNOSTIC_DETAIL]).also {
+            DiagnosticsLog.setCaptureMode(it.storedValue)
+        }
         _staticAppChrome.value = prefs[STATIC_APP_CHROME] ?: false
         GlassSection.entries.forEach { _glass.getValue(it).value = prefs[GLASS_KEYS.getValue(it)] ?: true }
         _searchAsYouType.value = prefs[SEARCH_AS_YOU_TYPE] ?: true
@@ -2220,6 +2242,7 @@ object SettingsStore {
     private val SUBTITLES_BY_DEFAULT = booleanPreferencesKey("subtitles_by_default")
     private val UPDATE_CHECK_ON_LAUNCH = booleanPreferencesKey("update_check_on_launch")
     private val RECEIVE_BETA_UPDATES = booleanPreferencesKey("receive_beta_updates")
+    private val DIAGNOSTIC_DETAIL = stringPreferencesKey("diagnostic_detail")
     private val STATIC_APP_CHROME = booleanPreferencesKey("static_app_chrome")
     private val GLASS_KEYS = GlassSection.entries.associateWith { booleanPreferencesKey("glass_${it.name.lowercase()}") }
     private val SEARCH_AS_YOU_TYPE = booleanPreferencesKey("search_as_you_type")
@@ -2389,6 +2412,7 @@ object SettingsStore {
 
     private val BACKUP_STRING_KEYS = listOf(
         APP_LAYOUT_MODE,
+        DIAGNOSTIC_DETAIL,
         EPISODE_DRAWER_LAYOUT,
         CAPTION_BACKGROUND_COLOR,
         CAPTION_POSITION,

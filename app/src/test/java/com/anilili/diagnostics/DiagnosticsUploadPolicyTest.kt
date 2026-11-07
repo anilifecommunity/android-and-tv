@@ -1,15 +1,22 @@
 package com.anilili.diagnostics
 
+import androidx.work.ExistingWorkPolicy
+import java.time.Duration
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Duration
-import java.time.ZoneId
-import java.time.LocalDate
-import java.time.ZonedDateTime
 
 class DiagnosticsUploadPolicyTest {
     @Test
@@ -48,5 +55,45 @@ class DiagnosticsUploadPolicyTest {
         assertFalse(diagnosticsUploadShouldCatchUp("2026-11-06", today))
         assertFalse(diagnosticsUploadShouldCatchUp(null, today))
         assertFalse(diagnosticsUploadShouldCatchUp("broken", today))
+    }
+
+    @Test
+    fun `ambiguous success retries while permanent rejection drops the staged report`() {
+        assertEquals(DiagnosticsReceiptDecision.ACCEPT, diagnosticsReceiptDecision(202, true))
+        assertEquals(DiagnosticsReceiptDecision.RETRY, diagnosticsReceiptDecision(202, false))
+        assertEquals(DiagnosticsReceiptDecision.RETRY, diagnosticsReceiptDecision(503, false))
+        assertEquals(DiagnosticsReceiptDecision.DROP, diagnosticsReceiptDecision(400, false))
+    }
+
+    @Test
+    fun `revocation stops automatic or auto staged work but not an independent manual report`() {
+        assertFalse(diagnosticsUploadShouldProceed(true, false, false))
+        assertFalse(diagnosticsUploadShouldProceed(false, true, false))
+        assertTrue(diagnosticsUploadShouldProceed(false, false, false))
+        assertTrue(diagnosticsUploadShouldProceed(true, true, true))
+        assertFalse(diagnosticsTriggerIsAutomatic(DiagnosticTrigger.MANUAL))
+        assertTrue(diagnosticsTriggerIsAutomatic(DiagnosticTrigger.DAILY))
+    }
+
+    @Test
+    fun `duplicate schedules replace one logical daily work item`() {
+        assertEquals(ExistingWorkPolicy.REPLACE, diagnosticsExistingWorkPolicy)
+    }
+
+    @Test
+    fun `manual and automatic uploads cannot overlap`() = runBlocking {
+        val active = AtomicInteger(0)
+        val maximum = AtomicInteger(0)
+        (1..12).map {
+            async(Dispatchers.Default) {
+                withDiagnosticsUploadLock {
+                    maximum.updateAndGet { current -> maxOf(current, active.incrementAndGet()) }
+                    delay(2)
+                    active.decrementAndGet()
+                }
+            }
+        }.awaitAll()
+
+        assertEquals(1, maximum.get())
     }
 }

@@ -55,6 +55,8 @@ class DiagnosticsHttpEventListener private constructor(private val callId: Long)
                 "method" to method,
                 "host" to host,
             ),
+            outcome = "started",
+            operationId = "http-$callId",
         )
     }
 
@@ -147,6 +149,12 @@ class DiagnosticsHttpEventListener private constructor(private val callId: Long)
                 "failureType" to (failure?.javaClass?.simpleName ?: "none"),
                 "failureMessage" to (failure?.message ?: "none"),
             ),
+            outcome = when (name) {
+                "http.call.complete" -> "success"
+                "http.call.canceled" -> "canceled"
+                else -> "failure"
+            },
+            operationId = "http-$callId",
         )
     }
 

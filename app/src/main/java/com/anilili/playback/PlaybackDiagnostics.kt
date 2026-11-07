@@ -1,8 +1,10 @@
 package com.anilili.playback
 
+import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
+import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -17,6 +19,32 @@ import java.io.IOException
 @OptIn(UnstableApi::class)
 object PlaybackDiagnostics {
     fun attach(player: ExoPlayer) {
+        val operationId = DiagnosticsLog.newOperationId("playback")
+        val attachedAtMs = SystemClock.elapsedRealtime()
+        val milestones = PlaybackMilestoneTracker(SystemClock::elapsedRealtime)
+        player.addListener(object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                DiagnosticsLog.event(
+                    "playback",
+                    "video.first_frame",
+                    mapOf("elapsedFromAttachMs" to (SystemClock.elapsedRealtime() - attachedAtMs)),
+                    outcome = "success",
+                    operationId = operationId,
+                )
+            }
+
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                milestones.onPlaybackStateChanged(playbackState)?.let { durationMs ->
+                    DiagnosticsLog.event(
+                        "playback",
+                        "rebuffer.completed",
+                        mapOf("durationMs" to durationMs),
+                        outcome = "success",
+                        operationId = operationId,
+                    )
+                }
+            }
+        })
         player.addAnalyticsListener(
             PlaybackStatsListener(false) { _, stats ->
                 DiagnosticsLog.event(
@@ -38,14 +66,21 @@ object PlaybackDiagnostics {
                         "fatalErrors" to stats.fatalErrorCount,
                         "nonFatalErrors" to stats.nonFatalErrorCount,
                     ),
+                    outcome = if (stats.fatalErrorCount > 0) "failure" else "success",
+                    operationId = operationId,
                 )
             },
         )
-        player.addAnalyticsListener(DetailListener())
-        DiagnosticsLog.event("playback", "analytics.attached")
+        player.addAnalyticsListener(DetailListener(operationId))
+        DiagnosticsLog.event(
+            "playback",
+            "analytics.attached",
+            outcome = "started",
+            operationId = operationId,
+        )
     }
 
-    private class DetailListener : AnalyticsListener {
+    private class DetailListener(private val operationId: String) : AnalyticsListener {
         private var lastVideoFormat: String? = null
         private var lastAudioFormat: String? = null
 
@@ -59,6 +94,7 @@ object PlaybackDiagnostics {
                 "playback",
                 "video.decoder_initialized",
                 mapOf("decoder" to decoderName, "durationMs" to initializationDurationMs),
+                operationId = operationId,
             )
         }
 
@@ -72,6 +108,7 @@ object PlaybackDiagnostics {
                 "playback",
                 "audio.decoder_initialized",
                 mapOf("decoder" to decoderName, "durationMs" to initializationDurationMs),
+                operationId = operationId,
             )
         }
 
@@ -103,6 +140,7 @@ object PlaybackDiagnostics {
                 "playback",
                 "video.frames_dropped",
                 mapOf("count" to droppedFrames, "windowMs" to elapsedMs),
+                operationId = operationId,
             )
         }
 
@@ -115,6 +153,7 @@ object PlaybackDiagnostics {
                     "height" to videoSize.height,
                     "pixelRatio" to videoSize.pixelWidthHeightRatio,
                 ),
+                operationId = operationId,
             )
         }
 
@@ -138,6 +177,8 @@ object PlaybackDiagnostics {
                     "failureType" to error.javaClass.simpleName,
                     "failureMessage" to (error.message ?: "none"),
                 ),
+                outcome = if (wasCanceled) "canceled" else "failure",
+                operationId = operationId,
             )
         }
 
@@ -156,6 +197,7 @@ object PlaybackDiagnostics {
                     "sampleRate" to format.sampleRate,
                     "language" to (format.language ?: "unknown"),
                 ),
+                operationId = operationId,
             )
         }
 
@@ -169,5 +211,25 @@ object PlaybackDiagnostics {
             format.sampleRate,
             format.language,
         ).joinToString("|")
+    }
+}
+
+internal class PlaybackMilestoneTracker(private val nowMs: () -> Long) {
+    private var reachedReady = false
+    private var rebufferStartedAtMs: Long? = null
+
+    fun onPlaybackStateChanged(state: Int): Long? = when (state) {
+        Player.STATE_BUFFERING -> {
+            if (reachedReady && rebufferStartedAtMs == null) rebufferStartedAtMs = nowMs()
+            null
+        }
+        Player.STATE_READY -> {
+            reachedReady = true
+            rebufferStartedAtMs?.let { started ->
+                rebufferStartedAtMs = null
+                (nowMs() - started).coerceAtLeast(0L)
+            }
+        }
+        else -> null
     }
 }

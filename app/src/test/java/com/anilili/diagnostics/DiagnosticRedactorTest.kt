@@ -94,4 +94,37 @@ class DiagnosticRedactorTest {
         assertFalse(redacted.exception?.message.orEmpty().contains("private-token"))
         assertFalse(redacted.exception?.stackTrace.orEmpty().contains("private/path"))
     }
+
+    @Test
+    fun `attributes and correlation are allowlisted and bounded`() {
+        val attributes = (1..60).associate { "field$it" to "x".repeat(600) } +
+            mapOf("bad key" to "drop", "token" to "secret")
+        val redacted = DiagnosticRedactor.redact(
+            DiagnosticEvent(
+                timestampUtc = "2026-07-30T12:00:00.000Z",
+                elapsedRealtimeMs = 1,
+                processUptimeMs = 1,
+                sessionId = "session",
+                sequence = 1,
+                process = "process",
+                pid = 1,
+                thread = "thread",
+                threadId = 1,
+                level = "INFO",
+                category = "test",
+                name = "bounds",
+                outcome = "SUCCESS WITH SPACES",
+                operationId = "unsafe/value",
+                traceId = "safe_trace",
+                attributes = attributes,
+            ),
+        )
+
+        assertEquals(48, redacted.attributes.size)
+        assertTrue(redacted.attributes.values.all { it.length <= 512 })
+        assertFalse("bad key" in redacted.attributes)
+        assertEquals("success_with_spaces", redacted.outcome)
+        assertEquals(null, redacted.operationId)
+        assertEquals("safe_trace", redacted.traceId)
+    }
 }
