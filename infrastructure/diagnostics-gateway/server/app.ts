@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { readFile, unlink } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
@@ -30,7 +31,7 @@ import type { DiagnosticTrigger, ReportMetadata, ReportStore, ScreenshotUpload }
 const STARTED_AT = Date.now();
 const REPORT_ID_PATTERN = /^ANL-[0-9]{8}-[A-Z0-9]{10}$/;
 const SAFE_FIELD_PATTERN = /^[A-Za-z0-9._-]{1,80}$/;
-const VALID_TRIGGERS = new Set<DiagnosticTrigger>(["manual", "crash", "slow_start", "shortcut"]);
+const VALID_TRIGGERS = new Set<DiagnosticTrigger>(["manual", "daily", "crash", "slow_start", "shortcut"]);
 
 interface AppDependencies {
   store: ReportStore;
@@ -38,7 +39,38 @@ interface AppDependencies {
 }
 
 class ClientInputError extends Error {}
+class ConflictError extends Error {}
 class DailyCapacityError extends Error {}
+
+interface TurnstileResult {
+  success?: boolean;
+  action?: string;
+  hostname?: string;
+}
+
+async function verifyTurnstile(config: RuntimeConfig, request: Request): Promise<boolean> {
+  const token = request.body?.turnstileToken;
+  if (typeof token !== "string" || token.length === 0 || token.length > 2_048) return false;
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret: config.turnstileSecret,
+        response: token,
+        remoteip: request.ip ?? request.socket.remoteAddress ?? "",
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return false;
+    const result = await response.json() as TurnstileResult;
+    return result.success === true &&
+      result.action === "admin_login" &&
+      result.hostname === config.turnstileHostname;
+  } catch {
+    return false;
+  }
+}
 
 export function temporaryUploadPath(tempDirectory: string, path: string): string {
   const root = resolve(tempDirectory);
@@ -149,6 +181,10 @@ export function createApp({ store, config }: AppDependencies) {
       },
     }),
   );
+  app.use((_request, response, next) => {
+    response.set("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex");
+    next();
+  });
   app.use(cookieParser());
   app.use(express.json({ limit: "8kb" }));
 
@@ -157,8 +193,8 @@ export function createApp({ store, config }: AppDependencies) {
       await store.healthCheck();
       response.set({
         "Cache-Control": "no-store",
-        "X-Anilili-Instance-Age": String(Math.floor((Date.now() - STARTED_AT) / 1000)),
-        "X-Anilili-Cold-Start": String(Date.now() - STARTED_AT < 120_000),
+        "X-Anilife-Instance-Age": String(Math.floor((Date.now() - STARTED_AT) / 1000)),
+        "X-Anilife-Cold-Start": String(Date.now() - STARTED_AT < 120_000),
       });
       response.json({ status: "ok", storage: "private-hf-bucket", retentionDays: RETENTION_DAYS });
     } catch (error) {
@@ -193,7 +229,14 @@ export function createApp({ store, config }: AppDependencies) {
       const description = descriptionField(request.body);
       const screenshot = await validateScreenshot(config.tempDirectory, screenshotFile);
 
+      const reportSha256 = createHash("sha256")
+        .update(await readFile(safeTempPath))
+        .digest("hex");
       if (await store.hasReport(reportId)) {
+        const existing = await store.getReport(reportId);
+        if (!existing || createHash("sha256").update(existing).digest("hex") !== reportSha256) {
+          throw new ConflictError("Report reference already belongs to different bytes");
+        }
         await removeTemporary(config.tempDirectory, tempPath);
         await removeTemporary(config.tempDirectory, screenshotTempPath);
         response.json({ status: "accepted", reportId, receivedBytes: reportFile.size });
@@ -215,6 +258,7 @@ export function createApp({ store, config }: AppDependencies) {
         reportId,
         receivedUtc: new Date().toISOString(),
         receivedBytes: reportFile.size,
+        reportSha256,
         trigger,
         appVersion,
         versionCode,
@@ -244,8 +288,8 @@ export function createApp({ store, config }: AppDependencies) {
       response.set({
         "Cache-Control": "no-store",
         "Server-Timing": `validate;dur=${validationMs.toFixed(1)}, store;dur=${storeMs.toFixed(1)}`,
-        "X-Anilili-Instance-Age": String(Math.floor((Date.now() - STARTED_AT) / 1000)),
-        "X-Anilili-Cold-Start": String(Date.now() - STARTED_AT < 120_000),
+        "X-Anilife-Instance-Age": String(Math.floor((Date.now() - STARTED_AT) / 1000)),
+        "X-Anilife-Cold-Start": String(Date.now() - STARTED_AT < 120_000),
       });
       response.json({ status: "accepted", reportId, receivedBytes: reportFile.size });
     } catch (error) {
@@ -255,7 +299,15 @@ export function createApp({ store, config }: AppDependencies) {
     }
   });
 
-  app.post("/api/admin/login", (request, response) => {
+  app.get("/api/turnstile/config", (_request, response) => {
+    response.set("Cache-Control", "no-store").json({ siteKey: config.turnstileSiteKey });
+  });
+
+  app.post("/api/admin/login", async (request, response) => {
+    if (!(await verifyTurnstile(config, request))) {
+      response.status(403).json({ error: "Bot verification failed" });
+      return;
+    }
     const address = request.ip ?? request.socket.remoteAddress ?? "unknown";
     if (!loginLimiter.allow(address)) {
       response.status(429).json({ error: "Too many sign-in attempts; try again later" });
@@ -357,6 +409,10 @@ export function createApp({ store, config }: AppDependencies) {
     }
     if (error instanceof ClientInputError || error instanceof ArchiveValidationError) {
       response.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof ConflictError) {
+      response.status(409).json({ error: error.message });
       return;
     }
     if (error instanceof UploadRateLimitError || error instanceof DailyCapacityError) {

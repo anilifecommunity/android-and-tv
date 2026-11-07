@@ -1,21 +1,33 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "anilili-diagnostics",
+  "name": "anilife-diagnostics",
   "main": "./cloudflare/index.ts",
-  "compatibility_date": "2026-07-30",
+  "compatibility_date": "2026-11-06",
   "compatibility_flags": ["nodejs_compat"],
   "upload_source_maps": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "diagnostics.anilifecommunity.org",
+      "zone_id": "2a0a6f585a3e7013e87139a5609e6670",
+      "custom_domain": true
+    }
+  ],
   "vars": {
     "ENVIRONMENT": "production",
-    "HF_NAMESPACE": "anilili",
-    "HF_BUCKET": "anilili-diagnostics"
+    "HF_NAMESPACE": "anilifecommunity",
+    "HF_BUCKET": "anilife-storage",
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAF2gLAMDwgKOrVA2",
+    "TURNSTILE_HOSTNAME": "diagnostics.anilifecommunity.org"
   },
   "secrets": {
     "required": [
       "HF_S3_ACCESS_KEY_ID",
       "HF_S3_SECRET_ACCESS_KEY",
       "ADMIN_ACCESS_KEY",
-      "RATE_LIMIT_SECRET"
+      "RATE_LIMIT_SECRET",
+      "TURNSTILE_SECRET"
     ]
   },
   "kv_namespaces": [
@@ -35,6 +47,7 @@
   },
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 0.1
+    "logs": { "enabled": true, "head_sampling_rate": 0.1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 }
   }
 }

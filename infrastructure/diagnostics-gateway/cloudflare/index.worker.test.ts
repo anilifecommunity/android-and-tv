@@ -15,19 +15,19 @@ async function clearKv(): Promise<void> {
   } while (cursor);
 }
 
-function reportZip(): Uint8Array {
+function reportZip(events = '{"name":"playback.buffer","attributes":{"host":"cdn.example"}}\n'): Uint8Array {
   return zipSync({
     "manifest.json": strToU8('{"appVersion":"0.1.51"}'),
-    "events.jsonl": strToU8('{"name":"playback.buffer","attributes":{"host":"cdn.example"}}\n'),
+    "events.jsonl": strToU8(events),
     "summary.txt": strToU8("redacted diagnostic summary"),
   });
 }
 
 function uploadRequest(
   reportId = "ANL-20260730-ABC123DE45",
-  options: { description?: string; screenshot?: boolean; invalidScreenshot?: boolean } = {},
+  options: { description?: string; screenshot?: boolean; invalidScreenshot?: boolean; events?: string } = {},
 ): Request {
-  const zip = reportZip();
+  const zip = reportZip(options.events);
   const form = new FormData();
   form.set("report_id", reportId);
   form.set("trigger", "crash");
@@ -72,9 +72,15 @@ afterEach(() => {
 });
 
 describe("Cloudflare diagnostics gateway", () => {
+  it("exposes only the public Turnstile site key", async () => {
+    const response = await dispatch(new IncomingRequest("https://diagnostics.example/api/turnstile/config"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ siteKey: env.TURNSTILE_SITE_KEY });
+  });
+
   it("checks the private Hugging Face bucket in health responses", async () => {
     const outbound = vi.fn(async () => new Response(
-      '<?xml version="1.0"?><ListBucketResult><Name>anilili-diagnostics</Name></ListBucketResult>',
+      '<?xml version="1.0"?><ListBucketResult><Name>anilife-storage</Name></ListBucketResult>',
       { status: 200, headers: { "Content-Type": "application/xml" } },
     ));
     vi.stubGlobal("fetch", outbound);
@@ -86,8 +92,8 @@ describe("Cloudflare diagnostics gateway", () => {
       storage: "private-hf-bucket",
       retentionDays: 30,
     });
-    expect(Number(response.headers.get("X-Anilili-Instance-Age"))).toBeGreaterThanOrEqual(0);
-    expect(Number(response.headers.get("X-Anilili-Instance-Age"))).toBeLessThan(120);
+    expect(Number(response.headers.get("X-Anilife-Instance-Age"))).toBeGreaterThanOrEqual(0);
+    expect(Number(response.headers.get("X-Anilife-Instance-Age"))).toBeLessThan(120);
     expect(outbound).toHaveBeenCalledTimes(1);
   });
 
@@ -114,6 +120,33 @@ describe("Cloudflare diagnostics gateway", () => {
     expect(methods).toEqual(["GET", "PUT", "PUT"]);
     const indexed = await env.RATE_LIMIT.list({ prefix: "report:" });
     expect(indexed.keys).toHaveLength(1);
+  });
+
+  it("accepts an identical retry but rejects changed bytes under the same report id", async () => {
+    const methods: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      methods.push(request.method);
+      if (request.method === "GET") {
+        return new Response("<ListBucketResult></ListBucketResult>", {
+          status: 200,
+          headers: { "Content-Type": "application/xml" },
+        });
+      }
+      return new Response(null, { status: 200 });
+    }));
+
+    const reportId = "ANL-20260730-IDEMP00001";
+    expect((await dispatch(uploadRequest(reportId))).status).toBe(200);
+    expect((await dispatch(uploadRequest(reportId))).status).toBe(200);
+    const conflict = await dispatch(uploadRequest(reportId, {
+      events: '{"name":"changed"}\n',
+    }));
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({
+      error: "Report reference already belongs to different bytes",
+    });
+    expect(methods).toEqual(["GET", "PUT", "PUT"]);
   });
 
   it("rejects malformed uploads before storing them", async () => {
@@ -170,21 +203,51 @@ describe("Cloudflare diagnostics gateway", () => {
   });
 
   it("requires the configured administrator key and issues an HttpOnly cookie", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      success: true,
+      action: "admin_login",
+      hostname: "diagnostics.example",
+    })));
     const wrong = await dispatch(new IncomingRequest("https://diagnostics.example/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.11" },
-      body: JSON.stringify({ accessKey: "incorrect-key-that-is-long-enough" }),
+      body: JSON.stringify({
+        accessKey: "incorrect-key-that-is-long-enough",
+        turnstileToken: "valid-test-token",
+      }),
     }));
     expect(wrong.status).toBe(401);
 
     const correct = await dispatch(new IncomingRequest("https://diagnostics.example/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json", "CF-Connecting-IP": "203.0.113.11" },
-      body: JSON.stringify({ accessKey: env.ADMIN_ACCESS_KEY }),
+      body: JSON.stringify({ accessKey: env.ADMIN_ACCESS_KEY, turnstileToken: "valid-test-token" }),
     }));
     expect(correct.status).toBe(200);
     expect(correct.headers.get("Set-Cookie")).toContain("HttpOnly");
     expect(correct.headers.get("Set-Cookie")).toContain("SameSite=Strict");
+  });
+
+  it("fails closed when Turnstile proof is missing or for the wrong action", async () => {
+    const missing = await dispatch(new IncomingRequest("https://diagnostics.example/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessKey: env.ADMIN_ACCESS_KEY }),
+    }));
+    expect(missing.status).toBe(403);
+
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      success: true,
+      action: "different_action",
+      hostname: "diagnostics.example",
+    })));
+    const wrongAction = await dispatch(new IncomingRequest("https://diagnostics.example/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessKey: env.ADMIN_ACCESS_KEY, turnstileToken: "wrong-action-token" }),
+    }));
+    expect(wrongAction.status).toBe(403);
+    expect(await wrongAction.json()).toEqual({ error: "Bot verification failed" });
   });
 
   it("does not expose admin routes without a signed session", async () => {

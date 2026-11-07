@@ -5,6 +5,7 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
+  "X-Robots-Tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
 };
 
 export class HttpError extends Error {

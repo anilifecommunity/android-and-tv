@@ -55,6 +55,12 @@ function redactDescription(value: string): string {
     .slice(0, MAX_DESCRIPTION_CHARS);
 }
 
+async function sha256Hex(bytes: ArrayBuffer): Promise<string> {
+  return [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function descriptionField(form: FormData): string | undefined {
   const value = form.get("description");
   if (value === null || value === "") return undefined;
@@ -138,9 +144,48 @@ function validateEnvironment(env: Env): void {
     !env.HF_S3_ACCESS_KEY_ID ||
     !env.HF_S3_SECRET_ACCESS_KEY ||
     !env.HF_NAMESPACE ||
-    !env.HF_BUCKET
+    !env.HF_BUCKET ||
+    !env.TURNSTILE_SECRET ||
+    !env.TURNSTILE_SITE_KEY ||
+    !env.TURNSTILE_HOSTNAME
   ) {
     throw new Error("Required Worker secrets are not configured");
+  }
+}
+
+interface TurnstileResult {
+  success?: boolean;
+  action?: string;
+  hostname?: string;
+}
+
+async function verifyTurnstile(request: Request, env: Env, token: unknown): Promise<void> {
+  if (typeof token !== "string" || token.length === 0 || token.length > 2_048) {
+    throw new HttpError(403, "Bot verification required");
+  }
+  let result: TurnstileResult;
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        secret: env.TURNSTILE_SECRET,
+        response: token,
+        remoteip: request.headers.get("CF-Connecting-IP") ?? "",
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new Error(`Turnstile verification failed (${response.status})`);
+    result = await response.json<TurnstileResult>();
+  } catch {
+    throw new HttpError(403, "Bot verification failed");
+  }
+  if (
+    result.success !== true ||
+    result.action !== "admin_login" ||
+    result.hostname !== env.TURNSTILE_HOSTNAME
+  ) {
+    throw new HttpError(403, "Bot verification failed");
   }
 }
 
@@ -148,8 +193,8 @@ function runtimeHeaders(now = Date.now()): HeadersInit {
   startedAt ??= now;
   const ageMs = Math.max(0, now - startedAt);
   return {
-    "X-Anilili-Cold-Start": String(ageMs < 120_000),
-    "X-Anilili-Instance-Age": String(Math.floor(ageMs / 1_000)),
+    "X-Anilife-Cold-Start": String(ageMs < 120_000),
+    "X-Anilife-Instance-Age": String(Math.floor(ageMs / 1_000)),
   };
 }
 
@@ -192,13 +237,26 @@ async function uploadReport(request: Request, env: Env): Promise<Response> {
     throw new HttpError(400, "Diagnostic report must be a ZIP archive");
   }
 
-  const store = new HfReportStore(env);
-  if (await store.hasReport(reportId)) {
+  const reportBytes = await reportValue.arrayBuffer();
+  const reportSha256 = await sha256Hex(reportBytes);
+  const existingIndexKey = await env.RATE_LIMIT.get(`report-id:${reportId}`);
+  const existing = existingIndexKey
+    ? await env.RATE_LIMIT.get<ReportMetadata>(existingIndexKey, "json")
+    : null;
+  if (existing) {
+    if (existing.reportSha256 !== reportSha256) {
+      throw new HttpError(409, "Report reference already belongs to different bytes");
+    }
     return jsonResponse(
       { status: "accepted", reportId, receivedBytes: reportValue.size },
       200,
       runtimeHeaders(),
     );
+  }
+
+  const store = new HfReportStore(env);
+  if (await store.hasReport(reportId)) {
+    throw new HttpError(409, "Report reference already exists without a verifiable checksum");
   }
 
   await reserveUpload(request, env);
@@ -208,7 +266,6 @@ async function uploadReport(request: Request, env: Env): Promise<Response> {
     throw new HttpError(429, "Daily diagnostic capacity reached; the app will retry later");
   }
 
-  const reportBytes = await reportValue.arrayBuffer();
   const archive = inspectDiagnosticZip(reportBytes, appVersion);
   // Folded now, while the archive is already in memory, so the console can aggregate server
   // performance across every report without fetching any of them back out of storage. Purely
@@ -222,6 +279,7 @@ async function uploadReport(request: Request, env: Env): Promise<Response> {
     reportId,
     receivedUtc: new Date().toISOString(),
     receivedBytes: reportValue.size,
+    reportSha256,
     trigger,
     appVersion,
     versionCode,
@@ -269,10 +327,14 @@ async function uploadReport(request: Request, env: Env): Promise<Response> {
 }
 
 async function adminLogin(request: Request, env: Env): Promise<Response> {
+  const body = await boundedJson(request);
+  const turnstileToken = body && typeof body === "object" && "turnstileToken" in body
+    ? (body as { turnstileToken?: unknown }).turnstileToken
+    : undefined;
+  await verifyTurnstile(request, env, turnstileToken);
   if (await loginIsBlocked(request, env)) {
     throw new HttpError(429, "Too many sign-in attempts; try again later");
   }
-  const body = await boundedJson(request);
   const accessKey = body && typeof body === "object" && "accessKey" in body
     ? (body as { accessKey?: unknown }).accessKey
     : undefined;
@@ -401,6 +463,9 @@ async function route(request: Request, env: Env): Promise<Response> {
       200,
       runtimeHeaders(),
     );
+  }
+  if (key === "GET /api/turnstile/config") {
+    return jsonResponse({ siteKey: env.TURNSTILE_SITE_KEY });
   }
   if (key === "POST /v1/reports") return uploadReport(request, env);
   if (key === "POST /api/admin/login") return adminLogin(request, env);

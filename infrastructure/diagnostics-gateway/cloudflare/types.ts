@@ -1,4 +1,4 @@
-export type DiagnosticTrigger = "manual" | "crash" | "slow_start" | "shortcut";
+export type DiagnosticTrigger = "manual" | "daily" | "crash" | "slow_start" | "shortcut";
 
 export interface ArchiveDetails {
   expandedBytes: number;
@@ -11,6 +11,7 @@ export interface ReportMetadata extends ArchiveDetails {
   reportId: string;
   receivedUtc: string;
   receivedBytes: number;
+  reportSha256: string;
   trigger: DiagnosticTrigger;
   appVersion: string;
   versionCode: string;

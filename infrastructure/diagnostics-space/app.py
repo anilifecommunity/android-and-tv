@@ -136,7 +136,7 @@ def cleanup_storage() -> None:
 
 
 api = FastAPI(
-    title="Anilili Diagnostics",
+    title="Anilife Diagnostics",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
@@ -150,8 +150,8 @@ def health() -> JSONResponse:
     return JSONResponse(
         {"status": "ok", "storage": "private", "retentionDays": 30},
         headers={
-            "X-Anilili-Instance-Age": str(uptime),
-            "X-Anilili-Cold-Start": str(uptime < 120).lower(),
+            "X-Anilife-Instance-Age": str(uptime),
+            "X-Anilife-Cold-Start": str(uptime < 120).lower(),
         },
     )
 
@@ -232,18 +232,18 @@ async def receive_report(
         {"status": "accepted", "reportId": report_id, "receivedBytes": received},
         headers={
             "Server-Timing": f"validate;dur={validation_ms:.1f}, store;dur={store_ms:.1f}",
-            "X-Anilili-Instance-Age": str(uptime),
-            "X-Anilili-Cold-Start": str(uptime < 120).lower(),
+            "X-Anilife-Instance-Age": str(uptime),
+            "X-Anilife-Cold-Start": str(uptime < 120).lower(),
         },
     )
 
 
-with gr.Blocks(title="Anilili Diagnostics") as landing:
+with gr.Blocks(title="Anilife Diagnostics") as landing:
     gr.Markdown(
         """
-        # Anilili Diagnostics
+        # Anilife Diagnostics
 
-        This service receives diagnostic reports only after an Anilili user chooses **Send
+        This service receives diagnostic reports only after an Anilife user chooses **Send
         diagnostics** or approves the crash prompt. Reports are stored privately for up to 30
         days. Passwords, cookies, tokens and sensitive links are removed by the app before upload.
 

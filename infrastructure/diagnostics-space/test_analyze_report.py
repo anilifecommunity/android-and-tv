@@ -16,17 +16,32 @@ class AnalyzeReportTest(unittest.TestCase):
                 "name": "process.sample",
                 "attributes": {"state": "foreground\u0085service", "pssKb": 10},
             }
+            ui_jank = {
+                "category": "render",
+                "name": "jank.sample_completed",
+                "attributes": {"playbackActive": False, "jankFrames": 2},
+            }
+            playback_cadence = {
+                "category": "render",
+                "name": "jank.sample_completed",
+                "attributes": {"playbackActive": True, "jankFrames": 200},
+            }
             with zipfile.ZipFile(report, "w") as archive:
                 archive.writestr("manifest.json", json.dumps({"appVersion": "test"}))
                 archive.writestr(
                     "events.jsonl",
-                    json.dumps(event, ensure_ascii=False).encode("utf-8") + b"\n",
+                    b"\n".join(
+                        json.dumps(row, ensure_ascii=False).encode("utf-8")
+                        for row in (event, ui_jank, playback_cadence)
+                    ) + b"\n",
                 )
 
             result = analyze(report)
 
-            self.assertEqual(result["eventCount"], 1)
+            self.assertEqual(result["eventCount"], 3)
             self.assertEqual(result["performance"]["samples"], 1)
+            self.assertEqual(result["performance"]["jankWindows"], 1)
+            self.assertEqual(result["performance"]["playbackCadenceWindows"], 1)
 
 
 if __name__ == "__main__":
