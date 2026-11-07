@@ -1,0 +1,39 @@
+---
+title: "Create a diagnostic report"
+sidebarTitle: "Diagnostics"
+description: "Export or upload a redacted Anilife diagnostic report, understand what it can contain, and attach screenshots only when you choose."
+icon: "file-search"
+keywords:
+  - "Anilife diagnostics"
+  - "bug report"
+  - "privacy"
+  - "export logs"
+---
+
+Anilife keeps diagnostics on the device by default. Create a report when a reproducible problem needs logs, device information, playback timing, or provider request details.
+
+## Export a report
+
+<Steps>
+  <Step title="Open App settings">
+    Open **Settings → App** and select **Export diagnostics**.
+  </Step>
+  <Step title="Describe the problem">
+    Add what you were doing, what you expected, and when the problem happened. A screenshot is optional and is never captured automatically.
+  </Step>
+  <Step title="Save or share the ZIP">
+    Review the destination and share the report only with a person or service you trust.
+  </Step>
+</Steps>
+
+Reports can include app and device configuration, Android version, performance samples, playback and buffering statistics, provider hosts, network timing, work status, app logs, crashes, and native exit information exposed by Android.
+
+Anilife redacts passwords, cookies, authorisation headers, account tokens, email addresses, signed media URLs, anime titles, slugs, and other sensitive content identifiers before creating the ZIP. A screenshot can still contain anything visible in the image, so attach only one you intend to send.
+
+## Optional uploads
+
+- **Upload diagnostics now** sends one redacted report to the private Anilife diagnostics service.
+- **Automatically upload diagnostics** is off by default. When enabled, it starts a new consent window and schedules at most one report per day.
+- Accepted uploads are private and retained for 30 days.
+
+Turning automatic upload off cancels queued work and removes staged reports. Local export remains available without enabling uploads.

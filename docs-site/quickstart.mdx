@@ -1,0 +1,46 @@
+---
+title: "Install Anilife on Android and TV"
+description: "Install the correct signed Anilife APK on a phone, tablet, Android TV, Google TV, or Fire TV and complete the first-launch checks."
+sidebarTitle: "Installation"
+keywords:
+  - "install Anilife"
+  - "Anilife APK"
+  - "Android TV APK"
+  - "Fire TV"
+---
+
+Install Anilife from the project's GitHub Releases page, then choose the APK that matches your device and form factor. Android 5.1 and compatible Fire OS 5 devices are supported.
+
+<Warning>
+  Download Anilife only from the [official GitHub Releases page](https://github.com/anilifecommunity/android-and-tv/releases). Builds from other sources are not supported.
+</Warning>
+
+<Steps>
+  <Step title="Open the latest release">
+    Open the [Anilife releases](https://github.com/anilifecommunity/android-and-tv/releases). A release marked **Pre-release** is intended for testers.
+  </Step>
+  <Step title="Choose the APK">
+    Use a phone/tablet APK for touch devices and a TV APK for Android TV, Google TV, or Fire TV. The universal APK is the safest choice when you do not know the device architecture.
+  </Step>
+  <Step title="Allow this installation">
+    Open the downloaded APK. If Android blocks it, allow installs from the browser or file manager you used, then return to the APK. Keep the permission limited to that app.
+  </Step>
+  <Step title="Launch and check navigation">
+    On a phone or tablet, confirm touch navigation works. On a TV, confirm the directional pad can reach the main navigation, Settings, and playback controls.
+  </Step>
+</Steps>
+
+## Release files
+
+| Device | Preferred build | Universal fallback |
+| --- | --- | --- |
+| 64-bit ARM phone or tablet | `Anilife_arm64-v8a.apk` | `Anilife.apk` |
+| 32-bit ARM phone or tablet | `Anilife_armeabi-v7a.apk` | `Anilife.apk` |
+| 64-bit ARM television | `Anilife_tv_arm64-v8a.apk` | `Anilife_tv.apk` |
+| 32-bit ARM television | `Anilife_tv_armeabi-v7a.apk` | `Anilife_tv.apk` |
+
+<Note>
+  Anilife uses the package name `io.github.anilifecommunity.anilife`. It installs separately from older apps that used `com.miruronative`, so those apps cannot update into Anilife or share private app data automatically.
+</Note>
+
+If you are moving from an older app, export a backup there first. Keep the old installation until you have imported the backup into Anilife and checked the restored data.

@@ -1,0 +1,47 @@
+---
+title: "Choose the right Anilife APK"
+sidebarTitle: "Device compatibility"
+description: "Match your phone, tablet, Android TV, Google TV, or Fire TV to the correct Anilife APK and architecture before installation."
+icon: "monitor-smartphone"
+keywords:
+  - "Anilife compatibility"
+  - "Android TV"
+  - "Fire TV"
+  - "ARM64"
+  - "ARMv7"
+---
+
+Anilife provides separate touch and television builds so each device gets the correct navigation and playback experience. Choose the universal APK when you are unsure whether the device uses 64-bit or 32-bit ARM.
+
+## APK selection
+
+| Device | Preferred APK | Fallback |
+| --- | --- | --- |
+| 64-bit ARM phone or tablet | `Anilife_arm64-v8a.apk` | `Anilife.apk` |
+| 32-bit ARM phone or tablet | `Anilife_armeabi-v7a.apk` | `Anilife.apk` |
+| 64-bit ARM television | `Anilife_tv_arm64-v8a.apk` | `Anilife_tv.apk` |
+| 32-bit ARM television | `Anilife_tv_armeabi-v7a.apk` | `Anilife_tv.apk` |
+
+Universal APKs include both supported ARM architectures. They use more download space but avoid architecture guesswork.
+
+## Device guidance
+
+<AccordionGroup>
+  <Accordion title="Android phones and tablets">
+    Use a phone/tablet APK. These builds use touch-first navigation and support Android 5.1 or newer.
+  </Accordion>
+
+  <Accordion title="Android TV and Google TV">
+    Use a TV APK. Transfer the APK with your normal file-transfer method or open the official Releases page in a trusted browser, then allow installation from that source.
+  </Accordion>
+
+  <Accordion title="Fire TV">
+    Use a TV APK. Compatible Fire OS 5 devices are supported. You can open the official GitHub Releases page in a trusted downloader browser or sideload the APK from a computer.
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  Do not install a phone APK on a television just because it is smaller. The TV build provides the remote-first interface and form-factor-specific update path.
+</Warning>
+
+If something fails only on one episode source, it may be a provider problem rather than device incompatibility. Include the device model, Android or Fire OS version, selected APK, and whether every source is affected when you report a problem.
