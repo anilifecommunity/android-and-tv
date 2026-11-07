@@ -3,7 +3,7 @@
 This file records user-visible changes to Anilife for Android and TV. Dates use UTC. A version
 stays marked **Unreleased** until its GitHub release is published.
 
-## [0.1.0-beta.2] - Unreleased
+## [0.1.0-beta.2] - 2026-11-07
 
 ### Added
 
@@ -64,5 +64,5 @@ stays marked **Unreleased** until its GitHub release is published.
 Beta.1 was a Discord tester build and was not claimed as real-device or stable hardware
 validation.
 
-[0.1.0-beta.2]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.1...HEAD
+[0.1.0-beta.2]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/anilifecommunity/android-and-tv/releases/tag/v0.1.0-beta.1
