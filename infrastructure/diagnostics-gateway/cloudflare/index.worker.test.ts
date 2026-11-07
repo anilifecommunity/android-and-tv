@@ -20,7 +20,7 @@ function reportZip(events = '{"name":"playback.buffer","attributes":{"host":"cdn
     "manifest.json": strToU8('{"appVersion":"0.1.51"}'),
     "events.jsonl": strToU8(events),
     "summary.txt": strToU8("redacted diagnostic summary"),
-  });
+  }, { mtime: new Date("2020-01-01T00:00:00Z") });
 }
 
 function uploadRequest(

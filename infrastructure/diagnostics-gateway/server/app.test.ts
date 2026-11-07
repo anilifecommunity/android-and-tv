@@ -250,6 +250,13 @@ describe("diagnostic gateway", () => {
     expect(missing.status).toBe(403);
   });
 
+  it("throttles sign-in attempts before performing bot verification", async () => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      expect((await request(app).post("/api/admin/login").send({})).status).toBe(403);
+    }
+    expect((await request(app).post("/api/admin/login").send({})).status).toBe(429);
+  });
+
   it("throttles repeated uploads from one address", async () => {
     for (let index = 0; index < 8; index += 1) {
       const suffix = `RATE${String(index).padStart(6, "0")}`;

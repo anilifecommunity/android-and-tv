@@ -150,10 +150,29 @@ function logEvent(name: string, attributes: Record<string, unknown> = {}): void 
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), name, ...attributes }));
 }
 
+function clientAddress(request: Request): string {
+  return request.ip ?? request.socket.remoteAddress ?? "unknown";
+}
+
 export function createApp({ store, config }: AppDependencies) {
   const app = express();
   const uploadRateLimiter = new UploadRateLimiter(config.rateLimitSecret);
   const loginLimiter = new AdminLoginLimiter();
+  const limitUploads = (request: Request, _response: Response, next: NextFunction): void => {
+    try {
+      uploadRateLimiter.reserve(clientAddress(request));
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+  const limitAdminLogin = (request: Request, response: Response, next: NextFunction): void => {
+    if (!loginLimiter.allow(clientAddress(request))) {
+      response.status(429).json({ error: "Too many sign-in attempts; try again later" });
+      return;
+    }
+    next();
+  };
   const upload = multer({
     dest: config.tempDirectory,
     limits: {
@@ -202,7 +221,7 @@ export function createApp({ store, config }: AppDependencies) {
     }
   });
 
-  app.post("/v1/reports", upload.fields([
+  app.post("/v1/reports", limitUploads, upload.fields([
     { name: "report", maxCount: 1 },
     { name: "screenshot", maxCount: 1 },
   ]), async (request, response, next) => {
@@ -243,7 +262,6 @@ export function createApp({ store, config }: AppDependencies) {
         return;
       }
 
-      uploadRateLimiter.reserve(request.ip ?? request.socket.remoteAddress ?? "unknown");
       const archiveDetails = await validateArchive(safeTempPath);
       const validationMs = performance.now() - started;
       const usage = await store.dailyUsage(utcDay());
@@ -303,14 +321,9 @@ export function createApp({ store, config }: AppDependencies) {
     response.set("Cache-Control", "no-store").json({ siteKey: config.turnstileSiteKey });
   });
 
-  app.post("/api/admin/login", async (request, response) => {
+  app.post("/api/admin/login", limitAdminLogin, async (request, response) => {
     if (!(await verifyTurnstile(config, request))) {
       response.status(403).json({ error: "Bot verification failed" });
-      return;
-    }
-    const address = request.ip ?? request.socket.remoteAddress ?? "unknown";
-    if (!loginLimiter.allow(address)) {
-      response.status(429).json({ error: "Too many sign-in attempts; try again later" });
       return;
     }
     if (!authenticateAdmin(config, request.body?.accessKey)) {
