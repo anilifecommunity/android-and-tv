@@ -319,6 +319,11 @@ def cmd_announce_clear(args: argparse.Namespace) -> None:
     }
     content = json.dumps(announcement, separators=(",", ":"), ensure_ascii=False)
     event = sign_event(PrivateKey(bytes.fromhex(load_secret_hex())), content, d_tag=ANNOUNCE_D_TAG)
+    if not verify_event(event):
+        sys.exit("Internal error: freshly signed event failed verification")
+    if args.write_event:
+        Path(args.write_event).write_text(json.dumps(event), encoding="utf-8")
+        print(f"Wrote signed event to {args.write_event}")
     if args.dry_run:
         print(json.dumps(event, indent=2))
         print("Dry run - not published.")
@@ -487,6 +492,7 @@ def main() -> None:
 
     retract = commands.add_parser("announce-clear", help="retract the live announcement")
     retract.add_argument("--dry-run", action="store_true", help="print the signed event without broadcasting")
+    retract.add_argument("--write-event", default=None, help="also write the signed retraction for serving as announcement.json")
     retract.set_defaults(func=cmd_announce_clear)
 
     commands.add_parser(

@@ -1,4 +1,4 @@
-# Anilili TV pairing protocol (v1, draft)
+# Anilife TV pairing protocol (v1, draft)
 
 How a phone running the `mobile` flavor signs a `tv` install into AniList or MyAnimeList over the
 local network, without either credential touching a third party.
@@ -45,7 +45,7 @@ The TV registers an NSD service while — and only while — pairing mode is ope
 
 ```
 type:  _anilili._tcp.
-name:  <device label>            e.g. "Anilili on BRAVIA-XR"
+name:  <device label>            e.g. "Anilife on BRAVIA-XR"
 port:  <ephemeral, OS-assigned>
 TXT:   v=1                       protocol version
        id=<8 hex chars>          session id, so a phone can dedupe re-registrations

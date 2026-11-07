@@ -8,8 +8,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.res.imageResource
@@ -45,6 +48,17 @@ fun WaterFillLogoIndicator(
         }
     }
     val logo = ImageBitmap.imageResource(R.drawable.anilili_launcher)
+    val accent = MaterialTheme.colorScheme.primary
+    val themedLogo = ColorFilter.colorMatrix(
+        ColorMatrix(
+            floatArrayOf(
+                0.2126f * accent.red, 0.7152f * accent.red, 0.0722f * accent.red, 0f, 0f,
+                0.2126f * accent.green, 0.7152f * accent.green, 0.0722f * accent.green, 0f, 0f,
+                0.2126f * accent.blue, 0.7152f * accent.blue, 0.0722f * accent.blue, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        ),
+    )
     androidx.compose.foundation.layout.Spacer(
         modifier = modifier
             .size(size)
@@ -52,9 +66,9 @@ fun WaterFillLogoIndicator(
             .drawWithCache {
                 val target = IntSize(this.size.width.roundToInt(), this.size.height.roundToInt())
                 onDrawBehind {
-                    drawImage(logo, dstSize = target, alpha = 0.18f)
+                    drawImage(logo, dstSize = target, alpha = 0.18f, colorFilter = themedLogo)
                     clipRect(top = this.size.height * (1f - progress.value)) {
-                        drawImage(logo, dstSize = target)
+                        drawImage(logo, dstSize = target, colorFilter = themedLogo)
                     }
                 }
             },

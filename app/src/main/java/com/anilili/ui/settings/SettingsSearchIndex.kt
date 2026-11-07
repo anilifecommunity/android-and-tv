@@ -192,6 +192,7 @@ internal fun settingsSearchEntries(isTv: Boolean): List<SettingsSearchEntry> = b
             if (isTv) add("Interface size" to listOf("size", "scale", "text", "big", "small", "zoom"))
             if (isTv) add("Overscan" to listOf("overscan", "edges", "cut off", "cropped", "bounds", "margin", "border", "fit"))
             add("Layout" to listOf("layout", "tv", "tablet", "phone", "form factor", "leanback"))
+            add("App layout" to listOf("layout", "legacy", "cinema", "navigation", "icons"))
             add(
                 "Keep the bars on screen" to listOf(
                     "bar", "chrome", "hide", "scroll", "menu", "top", "nav", "navigation", "fade",
@@ -251,12 +252,16 @@ internal fun settingsSearchEntries(isTv: Boolean): List<SettingsSearchEntry> = b
         listOf(
             "Check for updates on launch" to listOf("update", "version", "upgrade"),
             "Receive beta updates" to listOf("update", "beta", "preview", "tester"),
-            "Send diagnostics" to listOf("diagnostics", "logs", "report", "bug"),
+            "Automatically upload diagnostics" to
+                listOf("diagnostics", "logs", "report", "daily", "automatic", "consent"),
+            "Upload diagnostics now" to listOf("diagnostics", "logs", "report", "bug", "send"),
+            "Export diagnostics" to listOf("diagnostics", "logs", "report", "bug", "save", "share"),
         ),
     )
     section(
         "about", "About",
         listOf(
+            "Watch on Anilife.cc" to listOf("anilife", "website", "web", "watch"),
             "Discord server" to listOf("discord", "support", "community", "help"),
         ),
     )

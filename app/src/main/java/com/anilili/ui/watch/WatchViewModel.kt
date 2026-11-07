@@ -784,7 +784,7 @@ class WatchViewModel : ViewModel() {
                     description = info.description
                     totalEpisodes = info.episodes
                     seriesStatus = info.status
-                    DiagnosticsLog.event("Watch animeInfo success id=$id title=${seriesTitle.take(80)}")
+                    DiagnosticsLog.event("Watch animeInfo success id=$id")
                     launchNextSeasonLookup(info)
                 }
                 // Now that the category has settled, drop a stored server that has nothing to

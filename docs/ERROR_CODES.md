@@ -6,7 +6,7 @@ Every failure the app can show carries a code. Quote it in a bug report: it is t
 thing that survives a minified release build and can be matched against a diagnostics
 bundle, where the same code is the event name.
 
-A code may carry a second half, such as `PLAY-02/h403`. That is the underlying library's own
+A code may carry a second half: `PLAY-02/h403`. That is the underlying library's own
 error number, kept because it is more precise than anything this app invents:
 
 | Prefix | Source |

@@ -25,7 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.draw.clip
 import androidx.annotation.DrawableRes
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,6 +51,7 @@ import androidx.compose.material.icons.outlined.ClosedCaption
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PlayCircleOutline
 import androidx.compose.material.icons.outlined.Storage
@@ -113,6 +113,7 @@ import com.anilili.data.cache.CacheManager
 import com.anilili.data.discord.DiscordAuthManager
 import com.anilili.data.discord.DiscordRedirect
 import com.anilili.data.discord.DiscordRedirectBus
+import com.anilili.data.discord.validatedDiscordInviteUrl
 import com.anilili.data.library.LibraryStore
 import com.anilili.data.library.MalExportFile
 import com.anilili.data.library.MalImport
@@ -121,6 +122,7 @@ import com.anilili.data.reminder.AutomaticReleaseManager
 import com.anilili.data.reminder.ReleaseSyncScheduler
 import com.anilili.data.remote.DohProvider
 import com.anilili.data.settings.ClockFormat
+import com.anilili.data.settings.AppLayoutMode
 import com.anilili.data.settings.DiscordStatus
 import com.anilili.data.settings.DEFAULT_PLAYBACK_SPEED
 import com.anilili.data.settings.DefaultQuality
@@ -158,6 +160,7 @@ import com.anilili.diagnostics.DiagnosticSubmissionDialog
 import com.anilili.diagnostics.DiagnosticTrigger
 import com.anilili.diagnostics.DiagnosticsLog
 import com.anilili.diagnostics.DiagnosticsShareManager
+import com.anilili.diagnostics.DiagnosticsUploadManager
 import com.anilili.errors.AnililiError
 import com.anilili.errors.asFailure
 import com.anilili.errors.raise
@@ -297,6 +300,7 @@ private enum class SettingsPicker {
     THEME_BACKDROP_ANIME,
     THEME_BACKDROP_IMAGE_TV,
     THEME_BACKDROP_DIM,
+    APP_LAYOUT,
     FORM_FACTOR,
     POSTER_ELEMENTS,
     HOME_LAYOUT,
@@ -385,6 +389,7 @@ fun SettingsScreen(
         if (wallpaperAccentAvailable(device.isTv)) wallpaperSeed(context) else null
     }
     val formFactorPreference by SettingsStore.formFactorPreference.collectAsState()
+    val appLayoutMode by SettingsStore.appLayoutMode.collectAsState()
     val playerGestures by SettingsStore.playerGestures.collectAsState()
     val playerSeekGesture by SettingsStore.playerSeekGesture.collectAsState()
     val playerStatusBar by SettingsStore.playerStatusBar.collectAsState()
@@ -398,6 +403,8 @@ fun SettingsScreen(
     val downloadDestination by SettingsStore.downloadDestination.collectAsState()
     val releaseNotifications by SettingsStore.releaseNotifications.collectAsState()
     val announcements by SettingsStore.announcements.collectAsState()
+    val automaticDiagnostics by DiagnosticsUploadManager.automatic.collectAsState()
+    val diagnosticsUploadStatus by DiagnosticsUploadManager.status.collectAsState()
     val hideAdultContent by SettingsStore.hideAdultContent.collectAsState()
     val hideAiringTomorrowFromContinue by SettingsStore.hideAiringTomorrowFromContinue.collectAsState()
     val blurEpisodeImages by SettingsStore.blurEpisodeImages.collectAsState()
@@ -1951,6 +1958,19 @@ fun SettingsScreen(
             dismissOnSelect = false,
         )
 
+        SettingsPicker.APP_LAYOUT -> MidnightChoicePicker(
+            kicker = "Appearance",
+            title = "App layout",
+            explanation = "Legacy keeps the familiar Anilife navigation. Cinema uses the same " +
+                "screens and theme with compact, icon-first navigation.",
+            options = AppLayoutMode.entries,
+            selected = appLayoutMode,
+            label = { it.label },
+            onSelect = SettingsStore::setAppLayoutMode,
+            onDismiss = closePicker,
+            dismissOnSelect = false,
+        )
+
         null -> Unit
     }
     }
@@ -2918,6 +2938,14 @@ fun SettingsScreen(
                         onClick = { openPicker = SettingsPicker.FORM_FACTOR },
                     )
                 }
+                item(key = "App layout") {
+                    MidnightSettingRow(
+                        title = "App layout",
+                        description = "Choose familiar Legacy or icon-first Cinema navigation",
+                        value = appLayoutMode.label,
+                        onClick = { openPicker = SettingsPicker.APP_LAYOUT },
+                    )
+                }
                 // One switch on both: the phone's bars tuck away on a scroll, the television's top
                 // menu fades out a few seconds after the cursor leaves it.
                 item(key = "Keep the bars on screen") {
@@ -3175,10 +3203,36 @@ fun SettingsScreen(
                         onClick = { UpdateManager.check(context, manual = true) },
                     )
                 }
-                item(key = "Send diagnostics") {
+                item(key = "Automatically upload diagnostics") {
+                    MidnightSettingSwitchRow(
+                        title = "Automatically upload diagnostics",
+                        description = "Off by default · daily redacted reports after opt-in · private 30-day retention",
+                        checked = automaticDiagnostics,
+                        onCheckedChange = { DiagnosticsUploadManager.setAutomatic(context, it) },
+                    )
+                }
+                item(key = "Upload diagnostics now") {
                     MidnightSettingRow(
-                        title = "Send diagnostics",
-                        description = "Creates a redacted debugging ZIP and lets you send it",
+                        title = "Upload diagnostics now",
+                        description = "Send one redacted report to the private Anilife console",
+                        enabled = !diagnosticsBusy,
+                        busy = diagnosticsBusy,
+                        onClick = {
+                            scope.launch {
+                                diagnosticsBusy = true
+                                diagnosticsMessage = "Uploading redacted diagnostics…"
+                                diagnosticsMessage = runCatching {
+                                    DiagnosticsUploadManager.uploadNow(context)
+                                }.getOrElse { "Diagnostics upload failed; local export is still available" }
+                                diagnosticsBusy = false
+                            }
+                        },
+                    )
+                }
+                item(key = "Export diagnostics") {
+                    MidnightSettingRow(
+                        title = "Export diagnostics",
+                        description = "Save a redacted ZIP locally or share it yourself",
                         enabled = !diagnosticsBusy,
                         busy = diagnosticsBusy,
                         onClick = {
@@ -3187,18 +3241,37 @@ fun SettingsScreen(
                         },
                     )
                 }
-                diagnosticsMessage?.let { message ->
+                (diagnosticsMessage ?: diagnosticsUploadStatus)?.let { message ->
                     item { MidnightInlineNotice(message) }
                 }
             }
 
             settingsSection("about", openSectionId) {
+                item(key = "Watch on Anilife.cc") {
+                    MidnightSettingRow(
+                        title = "Watch on Anilife.cc",
+                        description = "Open the Anilife web app",
+                        leading = {
+                            Icon(
+                                imageVector = Icons.Outlined.Language,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = { openLink(context, "https://anilife.cc") },
+                    )
+                }
                 item(key = "Discord server") {
+                    val inviteUrl = validatedDiscordInviteUrl(BuildConfig.DISCORD_INVITE_URL)
                     MidnightSettingRow(
                         title = "Discord server",
-                        description = "Questions, source problems and release news",
+                        description = if (inviteUrl != null) {
+                            "Questions, source problems and release news"
+                        } else {
+                            "Invite unavailable in this build"
+                        },
                         leading = { AboutBrandGlyph(R.drawable.ic_brand_discord) },
-                        onClick = { openLink(context, "https://github.com/anilifecommunity/android-and-tv/issues") },
+                        enabled = inviteUrl != null,
+                        onClick = { inviteUrl?.let { openLink(context, it) } },
                     )
                 }
                 item(key = "about-note") { AboutSignature() }
@@ -4063,30 +4136,14 @@ private fun AboutSignature() {
             .padding(start = 14.dp, end = 14.dp, top = 22.dp, bottom = 8.dp),
     ) {
         Text(
-            text = "Anilife is a community project: an anime app that finds an episode across " +
-                "dozens of sources, remembers where you stopped, and keeps your list in step with " +
-                "AniList or MyAnimeList. No adverts, and no account of its own.",
+            text = "Anilife is a community-driven anime platform built to make watching anime " +
+                "simple and enjoyable. It discovers episodes across multiple sources, remembers " +
+                "where you left off, and keeps your anime library synchronised with AniList and " +
+                "MyAnimeList.\n\nNo unnecessary ads, no account required. Just anime, the way it " +
+                "should be.\n\n♡ Built with passion by the Anilife Team",
             style = MaterialTheme.typography.bodyMedium,
             color = Midnight.Text2,
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 14.dp),
-        ) {
-            Icon(
-                Icons.Outlined.FavoriteBorder,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp),
-            )
-            Text(
-                text = "Made with love by lili",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 8.dp),
-            )
-        }
     }
 }
 

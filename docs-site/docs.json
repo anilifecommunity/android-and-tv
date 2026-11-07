@@ -1,0 +1,106 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "Anilife",
+  "description": "Verified installation, update, privacy, and troubleshooting guides for Anilife on Android and TV.",
+  "colors": {
+    "primary": "#79D56B",
+    "light": "#B8F5A6",
+    "dark": "#50B84A"
+  },
+  "logo": {
+    "light": "https://raw.githubusercontent.com/anilifecommunity/android-and-tv/main/docs/assets/anilife-logo-round-transparent.png",
+    "dark": "https://raw.githubusercontent.com/anilifecommunity/android-and-tv/main/docs/assets/anilife-logo-round-transparent.png",
+    "href": "/"
+  },
+  "favicon": "https://raw.githubusercontent.com/anilifecommunity/android-and-tv/main/docs/assets/anilife-logo-round-transparent.png",
+  "appearance": {
+    "default": "dark",
+    "strict": false
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get started",
+        "pages": ["index", "quickstart"]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/device-compatibility",
+          "guides/updates",
+          "guides/accounts-and-library",
+          "guides/notifications"
+        ]
+      },
+      {
+        "group": "Help",
+        "pages": ["help/diagnostics", "help/troubleshooting"]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Watch",
+        "href": "https://anilife.cc"
+      },
+      {
+        "type": "github",
+        "href": "https://github.com/anilifecommunity/android-and-tv"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Download",
+      "href": "https://github.com/anilifecommunity/android-and-tv/releases"
+    }
+  },
+  "footer": {
+    "socials": {
+      "website": "https://anilife.cc",
+      "github": "https://github.com/anilifecommunity"
+    },
+    "links": [
+      {
+        "header": "Anilife",
+        "items": [
+          {
+            "label": "Watch online",
+            "href": "https://anilife.cc"
+          },
+          {
+            "label": "Android and TV releases",
+            "href": "https://github.com/anilifecommunity/android-and-tv/releases"
+          }
+        ]
+      },
+      {
+        "header": "Support",
+        "items": [
+          {
+            "label": "Open issues",
+            "href": "https://github.com/anilifecommunity/android-and-tv/issues"
+          },
+          {
+            "label": "Security reports",
+            "href": "https://github.com/anilifecommunity/android-and-tv/security/advisories/new"
+          }
+        ]
+      }
+    ]
+  },
+  "contextual": {
+    "options": ["copy"],
+    "display": "header"
+  },
+  "seo": {
+    "indexing": "navigable",
+    "metatags": {
+      "canonical": "https://docs.anilife.cc"
+    }
+  }
+}

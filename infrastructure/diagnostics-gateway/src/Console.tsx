@@ -345,7 +345,7 @@ export function Console({ onSignedOut }: { onSignedOut: () => void }) {
       for (const id of ids) {
         await jsonRequest(`/api/admin/reports/${id}`, {
           method: "DELETE",
-          headers: { "X-Anilili-Admin": "1" },
+          headers: { "X-Anilife-Admin": "1" },
         });
       }
       setChecked(new Set());
@@ -400,7 +400,7 @@ export function Console({ onSignedOut }: { onSignedOut: () => void }) {
   async function signOut() {
     await jsonRequest("/api/admin/logout", {
       method: "POST",
-      headers: { "X-Anilili-Admin": "1" },
+      headers: { "X-Anilife-Admin": "1" },
     }).catch(() => undefined);
     onSignedOut();
   }
@@ -410,7 +410,7 @@ export function Console({ onSignedOut }: { onSignedOut: () => void }) {
       <header className="bar">
         <div className="console-mark">
           <span className="console-mark__icon"><SignalIcon /></span>
-          <span>ANILILI / OPS</span>
+          <span>ANILIFE / OPS</span>
         </div>
         <div className="bar__readouts">
           <span><b>{all.length}</b> stored</span>

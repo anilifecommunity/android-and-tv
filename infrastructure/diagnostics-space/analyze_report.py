@@ -44,7 +44,12 @@ def analyze(path: Path) -> dict:
     process_samples = [event for event in events if event.get("name") == "process.sample"]
     pss = [number(event.get("attributes", {}).get("pssKb")) for event in process_samples]
     cpu = [number(event.get("attributes", {}).get("processCpuPercent")) for event in process_samples]
-    jank = [event for event in events if event.get("name") == "jank.sample_completed"]
+    all_jank = [event for event in events if event.get("name") == "jank.sample_completed"]
+    playback_jank = [
+        event for event in all_jank
+        if str(event.get("attributes", {}).get("playbackActive", "false")).lower() == "true"
+    ]
+    jank = [event for event in all_jank if event not in playback_jank]
     playback = [event for event in events if event.get("category") == "playback"]
     resolver = [event for event in events if event.get("category") == "resolver"]
     failures = [
@@ -77,6 +82,7 @@ def analyze(path: Path) -> dict:
             "maxPssKb": max(pss, default=None),
             "maxProcessCpuPercent": max(cpu, default=None),
             "jankWindows": len(jank),
+            "playbackCadenceWindows": len(playback_jank),
             "jank": jank,
         },
         "playbackEventCount": len(playback),
@@ -85,7 +91,7 @@ def analyze(path: Path) -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Summarize an Anilili diagnostic ZIP")
+    parser = argparse.ArgumentParser(description="Summarize an Anilife diagnostic ZIP")
     parser.add_argument("report", type=Path)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()

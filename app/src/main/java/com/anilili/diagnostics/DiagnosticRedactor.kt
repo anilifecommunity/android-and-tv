@@ -15,6 +15,9 @@ internal object DiagnosticRedactor {
             "password|passwd|secret|query|title|slug|url|uri|referer|mediaId|data|body)\\1" +
             "\\s*([=:])\\s*(\\\"[^\\\"]*\\\"|'[^']*'|[^\\s,;}]+)",
     )
+    private val sensitiveFreeTextAssignment = Regex(
+        pattern = "(?i)\\b(query|title|slug|data|body)\\s*([=:])\\s*[^,;}\\r\\n]*",
+    )
     private val sensitiveKeys = Regex(
         "(?i)^(authorization|cookie|set-cookie|access[_-]?token|refresh[_-]?token|token|" +
             "password|passwd|secret|query|title|slug|url|uri|referer|mediaId|data|body)$",
@@ -26,6 +29,12 @@ internal object DiagnosticRedactor {
         redacted = bearerPattern.replace(redacted, "Bearer $REDACTED")
         redacted = jwtPattern.replace(redacted, REDACTED)
         redacted = emailPattern.replace(redacted, "<redacted-email>")
+        // Unquoted page titles and search text contain spaces; token-shaped replacement leaked the
+        // remainder (for example `title=<redacted> A Silent Voice`). Structured callers should use
+        // attributes, so consuming the free-text field to its delimiter is the safe fallback.
+        redacted = sensitiveFreeTextAssignment.replace(redacted) { match ->
+            "${match.groupValues[1]}${match.groupValues[2]}$REDACTED"
+        }
         redacted = sensitiveAssignment.replace(redacted) { match ->
             val keyQuote = match.groupValues[1]
             val value = match.groupValues[4]

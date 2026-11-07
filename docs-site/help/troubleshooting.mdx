@@ -1,0 +1,50 @@
+---
+title: "Troubleshoot Anilife"
+sidebarTitle: "Troubleshooting"
+description: "Resolve common installation, update, playback, account, and notification problems before sending a focused Anilife bug report."
+icon: "wrench"
+keywords:
+  - "Anilife troubleshooting"
+  - "playback problem"
+  - "update failed"
+  - "error code"
+---
+
+Start with the smallest check that matches the symptom, then collect a diagnostic report if the problem is repeatable. Provider availability can change independently of the app.
+
+## Installation or update fails
+
+1. Confirm you selected a phone or TV APK for the correct form factor.
+2. Use the universal APK when the CPU architecture is unknown.
+3. Check free storage and allow installation from the browser or file manager that opened the APK.
+4. Run **Settings → App → Check for updates** again.
+5. Do not uninstall first unless you have protected local data you need.
+
+## Playback fails
+
+1. Try another server for the same episode.
+2. Check whether other episodes and titles play.
+3. Retry after changing networks or restarting the device.
+4. Record the error code shown by Anilife.
+5. Export diagnostics soon after the failure.
+
+A failure limited to one source is usually different from a device-wide playback failure. Include that distinction in a report.
+
+## Account or sync fails
+
+Confirm the intended service is still shown as connected in **Settings → Accounts & sync**. Signing in to AniList or MyAnimeList switches the active list service. Retry the action after reconnecting only if the existing session is reported as expired.
+
+## Get support
+
+Search the [open issues](https://github.com/anilifecommunity/android-and-tv/issues) for the device, provider, or error code. If the problem is new, use the [bug report form](https://github.com/anilifecommunity/android-and-tv/issues/new?template=bug_report.yml) and include:
+
+- Anilife version and build number
+- device model and Android or Fire OS version
+- phone/tablet or TV APK name
+- exact steps and expected result
+- whether one provider or every provider is affected
+- a redacted diagnostic ZIP, if you choose to share one
+
+<Danger>
+  Do not post vulnerabilities, leaked credentials, tokens, cookies, private media URLs, account identifiers, or personal data in a public issue. Use [GitHub Security Advisories](https://github.com/anilifecommunity/android-and-tv/security/advisories/new) for security reports.
+</Danger>

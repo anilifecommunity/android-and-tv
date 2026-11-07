@@ -23,6 +23,7 @@ export const REPORT_ID_PATTERN = /^ANL-[0-9]{8}-[A-Z0-9]{10}$/;
 export const SAFE_FIELD_PATTERN = /^[A-Za-z0-9._-]{1,80}$/;
 export const VALID_TRIGGERS = new Set<DiagnosticTrigger>([
   "manual",
+  "daily",
   "crash",
   "slow_start",
   "shortcut",

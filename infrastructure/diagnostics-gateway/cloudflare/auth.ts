@@ -6,7 +6,7 @@ import {
 } from "./constants";
 import { HttpError } from "./http";
 
-const COOKIE_NAME = "anilili_diagnostics_admin";
+const COOKIE_NAME = "anilife_diagnostics_admin";
 const encoder = new TextEncoder();
 
 function base64Url(bytes: Uint8Array): string {
@@ -78,7 +78,7 @@ export async function requireAdmin(request: Request, env: Env): Promise<void> {
 }
 
 export function requireAdminMutation(request: Request): void {
-  if (request.headers.get("X-Anilili-Admin") !== "1") {
+  if (request.headers.get("X-Anilife-Admin") !== "1") {
     throw new HttpError(403, "Missing administrator request proof");
   }
 }

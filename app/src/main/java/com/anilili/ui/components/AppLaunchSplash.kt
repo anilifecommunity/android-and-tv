@@ -21,12 +21,12 @@ fun AppLaunchSplash(
 ) {
     val latestOnFinished = rememberUpdatedState(onFinished)
     Box(
-        modifier = modifier.fillMaxSize().background(Color(0xFF0B0B0F)),
+        modifier = modifier.fillMaxSize().background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         UnscaledUi {
             WaterFillLogoIndicator(
-                size = 184.dp,
+                size = 152.dp,
                 playOnce = true,
                 onFilled = { latestOnFinished.value() },
             )

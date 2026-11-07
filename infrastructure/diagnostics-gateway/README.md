@@ -2,7 +2,7 @@
 
 Cloudflare Workers receiver and administrator dashboard for user-approved Anilife diagnostic
 reports. Android and TV send the multipart request covered by `DiagnosticUploadClientTest`; the
-Worker validates and stores reports in the private `anilili/anilili-diagnostics` Hugging Face
+Worker validates and stores reports in the private `anilifecommunity/anilife-storage` Hugging Face
 Storage Bucket.
 
 The deployment is designed for Cloudflare Workers Free. Static dashboard assets are served by the
@@ -12,8 +12,10 @@ files. No Google service is involved.
 ## Security model
 
 - Hugging Face S3 credentials and administrator secrets exist only in Cloudflare encrypted secrets.
-- The public surface is limited to `GET /health` and `POST /v1/reports`.
+- The public surface is limited to health, report upload, and the public Turnstile site-key endpoint.
 - Report browsing, downloading, and deletion require an HttpOnly administrator session.
+- Administrator login requires a hostname- and action-bound Cloudflare Turnstile proof before the
+  access key is checked.
 - Report IDs and metadata are validated. ZIP central-directory validation rejects traversal,
   symlinks, encryption, duplicate names, excess entries, and excessive declared expansion.
 - The Android exporter performs the content redaction before upload; the Worker never logs report
@@ -57,7 +59,7 @@ npm run deploy:dry-run
 npx wrangler check startup
 ```
 
-For local Worker development, create an ignored `.dev.vars` file with test-only values for the four
+For local Worker development, create an ignored `.dev.vars` file with test-only values for the five
 required secrets and run `npm run dev`. The Node receiver in `server/` remains only as a local
 contract reference and can be started with `npm run dev:node`.
 

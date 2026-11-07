@@ -1,4 +1,4 @@
-export type Trigger = "manual" | "crash" | "slow_start" | "shortcut";
+export type Trigger = "manual" | "daily" | "crash" | "slow_start" | "shortcut";
 
 export interface SourceProviderStat {
   attempts: number;
@@ -21,6 +21,7 @@ export interface ReportMetadata {
   reportId: string;
   receivedUtc: string;
   receivedBytes: number;
+  reportSha256: string;
   trigger: Trigger;
   appVersion: string;
   versionCode: string;
@@ -58,6 +59,7 @@ export const TRIGGER_LABEL: Record<Trigger, string> = {
   crash: "Crash",
   slow_start: "Performance",
   manual: "Manual",
+  daily: "Daily",
   shortcut: "Shortcut",
 };
 

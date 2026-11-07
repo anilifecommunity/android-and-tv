@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { zipSync, strToU8 } from "fflate";
 import request from "supertest";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApp, temporaryUploadPath } from "./app.js";
 import type {
   CleanupResult,
@@ -113,21 +113,31 @@ describe("diagnostic gateway", () => {
       store,
       config: {
         adminAccessKey: "admin-access-key-with-more-than-24-characters",
-        rateLimitSecret: "rate-limit-secret-with-more-than-24-characters",
-        tempDirectory: await mkdtemp(join(tmpdir(), "anilili-diagnostics-")),
+        turnstileSecret: "turnstile-secret-for-tests",
+        turnstileSiteKey: "1x00000000000000000000AA",
+        turnstileHostname: "diagnostics.example",
+        tempDirectory: await mkdtemp(join(tmpdir(), "anilife-diagnostics-")),
         secureCookies: false,
       },
     });
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({
+      success: true,
+      action: "admin_login",
+      hostname: "diagnostics.example",
+    })));
   });
+
+  afterEach(() => vi.unstubAllGlobals());
 
   it("reports private storage health", async () => {
     const response = await request(app).get("/health");
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ status: "ok", storage: "private-hf-bucket" });
+    expect(response.headers["x-robots-tag"]).toContain("noindex");
   });
 
   it("rejects temporary upload paths outside the configured directory", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "anilili-upload-path-"));
+    const directory = await mkdtemp(join(tmpdir(), "anilife-upload-path-"));
     expect(temporaryUploadPath(directory, join(directory, "report.zip"))).toBe(join(directory, "report.zip"));
     expect(() => temporaryUploadPath(directory, join(directory, "..", "outside.zip"))).toThrow(
       "Invalid temporary upload path",
@@ -150,9 +160,20 @@ describe("diagnostic gateway", () => {
   });
 
   it("treats a repeated report ID as idempotent", async () => {
-    expect((await reportRequest(app, "ANL-20260730-ABC123DE45")).status).toBe(200);
-    expect((await reportRequest(app, "ANL-20260730-ABC123DE45")).status).toBe(200);
+    const archive = diagnosticZip();
+    expect((await reportRequest(app, "ANL-20260730-ABC123DE45", archive)).status).toBe(200);
+    expect((await reportRequest(app, "ANL-20260730-ABC123DE45", archive)).status).toBe(200);
     expect(store.reports.size).toBe(1);
+  });
+
+  it("rejects changed bytes under an existing report ID", async () => {
+    const reportId = "ANL-20260730-IDEMP00001";
+    expect((await reportRequest(app, reportId)).status).toBe(200);
+    const conflict = await reportRequest(app, reportId, diagnosticZip('{"name":"changed"}\n'));
+    expect(conflict.status).toBe(409);
+    expect(conflict.body).toEqual({
+      error: "Report reference already belongs to different bytes",
+    });
   });
 
   it("stores redacted user context and an optional screenshot", async () => {
@@ -200,7 +221,10 @@ describe("diagnostic gateway", () => {
     const agent = request.agent(app);
     const login = await agent
       .post("/api/admin/login")
-      .send({ accessKey: "admin-access-key-with-more-than-24-characters" });
+      .send({
+        accessKey: "admin-access-key-with-more-than-24-characters",
+        turnstileToken: "valid-test-token",
+      });
     expect(login.status).toBe(200);
 
     const listing = await agent.get("/api/admin/reports");
@@ -213,9 +237,23 @@ describe("diagnostic gateway", () => {
 
     const deleted = await agent
       .delete("/api/admin/reports/ANL-20260730-ABC123DE45")
-      .set("X-Anilili-Admin", "1");
+      .set("X-Anilife-Admin", "1");
     expect(deleted.status).toBe(200);
     expect(store.reports.size).toBe(0);
+  });
+
+  it("requires a valid Turnstile proof before checking the administrator key", async () => {
+    const missing = await request(app)
+      .post("/api/admin/login")
+      .send({ accessKey: "admin-access-key-with-more-than-24-characters" });
+    expect(missing.status).toBe(403);
+  });
+
+  it("throttles sign-in attempts before performing bot verification", async () => {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      expect((await request(app).post("/api/admin/login").send({})).status).toBe(403);
+    }
+    expect((await request(app).post("/api/admin/login").send({})).status).toBe(429);
   });
 
   it("throttles repeated uploads from one address", async () => {

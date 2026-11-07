@@ -20,8 +20,8 @@ val diagnosticBuildSha = providers.environmentVariable("GITHUB_SHA").orNull
             isIgnoreExitValue = true
         }.standardOutput.asText.get().trim()
     }.getOrDefault("unknown").ifBlank { "unknown" }
-val appVersionCode = 1
-val appVersionName = "0.1.0-beta.1"
+val appVersionCode = 2
+val appVersionName = "0.1.0-beta.2"
 
 tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
     componentName = "Anilife"
@@ -49,6 +49,8 @@ val anilistClientId = infrastructureValue("ANILIST_CLIENT_ID", "anilistClientId"
 val malClientId = infrastructureValue("MAL_CLIENT_ID", "malClientId")
 val simklClientId = infrastructureValue("SIMKL_CLIENT_ID", "simklClientId")
 val discordApplicationId = infrastructureValue("DISCORD_APPLICATION_ID", "discordApplicationId")
+val discordInviteUrl = infrastructureValue("DISCORD_INVITE_URL", "discordInviteUrl")
+val diagnosticsUploadUrl = infrastructureValue("DIAGNOSTICS_UPLOAD_URL", "diagnosticsUploadUrl")
 val openSubtitlesApiKey = infrastructureValue("OPEN_SUBTITLES_API_KEY", "openSubtitlesApiKey")
 val kartoonsAccountTokens = infrastructureValue("KARTOONS_ACCOUNT_TOKENS", "kartoonsAccountTokens")
 val kartoonsTokensMirrorUrl = infrastructureValue("KARTOONS_TOKENS_MIRROR_URL", "kartoonsTokensMirrorUrl")
@@ -76,6 +78,8 @@ android {
         buildConfigField("String", "MAL_CLIENT_ID", buildConfigString(malClientId))
         buildConfigField("String", "SIMKL_CLIENT_ID", buildConfigString(simklClientId))
         buildConfigField("String", "DISCORD_APPLICATION_ID", buildConfigString(discordApplicationId))
+        buildConfigField("String", "DISCORD_INVITE_URL", buildConfigString(discordInviteUrl))
+        buildConfigField("String", "DIAGNOSTICS_UPLOAD_URL", buildConfigString(diagnosticsUploadUrl))
         buildConfigField("String", "KARTOONS_ACCOUNT_TOKENS", buildConfigString(kartoonsAccountTokens))
         buildConfigField("String", "KARTOONS_TOKENS_MIRROR_URL", buildConfigString(kartoonsTokensMirrorUrl))
         buildConfigField("String", "RIFT_FIREBASE_API_KEY", buildConfigString(riftFirebaseApiKey))
@@ -264,7 +268,7 @@ val parityCorpus: File? = generateSequence(rootProject.projectDir.parentFile) { 
     .firstOrNull { it.isDirectory }
 val syncParityCorpus = tasks.register<Sync>("syncParityCorpus") {
     description = "Refreshes src/test/resources/parity from ../anilili-desktop/fixtures/parity."
-    onlyIf("the desktop checkout is next to this one") { parityCorpus != null }
+    enabled = parityCorpus != null
     parityCorpus?.let { from(it) }
     into(layout.projectDirectory.dir("src/test/resources/parity"))
 }

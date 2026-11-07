@@ -347,8 +347,8 @@ export function createStoreFromEnvironment(): ReportStore {
     }
     return new FileSystemReportStore(process.env.DIAGNOSTICS_LOCAL_DATA_DIR);
   }
-  const namespace = process.env.HF_NAMESPACE ?? "anilili";
-  const bucket = process.env.HF_BUCKET ?? "anilili-diagnostics";
+  const namespace = process.env.HF_NAMESPACE ?? "anilifecommunity";
+  const bucket = process.env.HF_BUCKET ?? "anilife-storage";
   const accessKeyId = process.env.HF_S3_ACCESS_KEY_ID ?? "";
   const secretAccessKey = process.env.HF_S3_SECRET_ACCESS_KEY ?? "";
   if (!accessKeyId || !secretAccessKey) {
