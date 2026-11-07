@@ -86,6 +86,9 @@ val AppChromeListBottomGap = 48.dp
  */
 val TvTopNavigationHeight = 82.dp
 
+/** False while Cinema's TV sidebar replaces the Legacy top navigation. */
+val LocalTvTopNavigationVisible = compositionLocalOf { true }
+
 /**
  * Lays a TV destination out below the top navigation from its very first frame.
  *
@@ -101,7 +104,7 @@ val TvTopNavigationHeight = 82.dp
  */
 @Composable
 fun TvTopNavigationInset(content: @Composable () -> Unit) {
-    if (!LocalAppDeviceProfile.current.isTv) {
+    if (!LocalAppDeviceProfile.current.isTv || !LocalTvTopNavigationVisible.current) {
         content()
         return
     }

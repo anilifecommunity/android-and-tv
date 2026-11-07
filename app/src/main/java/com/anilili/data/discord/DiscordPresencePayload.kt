@@ -1,5 +1,7 @@
 package com.anilili.data.discord
 
+import com.anilili.BuildConfig
+import java.net.URI
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -59,7 +61,24 @@ private const val MAX_BUTTON_URL = 512
 
 /** The card's one button, which opens the project's Discord server (Settings > About's link). */
 internal const val WATCH_BUTTON_LABEL = "Get Anilife"
-internal const val WATCH_BUTTON_URL = "https://github.com/anilifecommunity/android-and-tv"
+internal val WATCH_BUTTON_URL: String?
+    get() = validatedDiscordInviteUrl(BuildConfig.DISCORD_INVITE_URL)
+
+/** Accept only Discord's documented HTTPS invite forms; never turn a bad value into another link. */
+internal fun validatedDiscordInviteUrl(raw: String): String? {
+    val candidate = raw.trim()
+    val uri = runCatching { URI(candidate) }.getOrNull() ?: return null
+    if (!uri.scheme.equals("https", ignoreCase = true) || uri.userInfo != null) return null
+    if (uri.port !in listOf(-1, 443)) return null
+    val path = uri.path.orEmpty()
+    val validPath = when (uri.host?.lowercase()) {
+        "discord.gg" -> path.removePrefix("/").isNotBlank()
+        "discord.com", "www.discord.com" ->
+            path.startsWith("/invite/") && path.removePrefix("/invite/").isNotBlank()
+        else -> false
+    }
+    return candidate.takeIf { validPath }
+}
 
 /**
  * The keys the small-badge art was uploaded under in the developer portal.
@@ -134,11 +153,13 @@ internal fun buildPresencePayload(
 
     // The button sends whoever sees the card to the project rather than to the series: there are no
     // per-title pages to link, and a viewer who wants the series can find it once they have the app.
-    activity.put("buttons", JSONArray().put(WATCH_BUTTON_LABEL.take(MAX_BUTTON_LABEL)))
-    activity.put(
-        "metadata",
-        JSONObject().put("button_urls", JSONArray().put(WATCH_BUTTON_URL.take(MAX_BUTTON_URL))),
-    )
+    WATCH_BUTTON_URL?.let { inviteUrl ->
+        activity.put("buttons", JSONArray().put(WATCH_BUTTON_LABEL.take(MAX_BUTTON_LABEL)))
+        activity.put(
+            "metadata",
+            JSONObject().put("button_urls", JSONArray().put(inviteUrl.take(MAX_BUTTON_URL))),
+        )
+    }
 
     return sessionPresence(status, nowMs).put("activities", JSONArray().put(activity))
 }

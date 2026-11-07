@@ -1,16 +1,64 @@
-MIT No Attribution
+Anilife Source-Available License 1.0
 
-Copyright 2026 sanilili
+Copyright (c) 2026 Anilife Community contributors
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this
-software and associated documentation files (the "Software"), to deal in the Software
-without restriction, including without limitation the rights to use, copy, modify,
-merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so.
+1. Permission
+
+Subject to this licence, you may view, download, run, and modify the Software for
+personal, non-commercial use. You may also make a source-code fork solely to prepare
+and submit contributions to the official Anilife repository.
+
+2. Contribution forks
+
+A contribution fork may contain the minimum source changes and history needed for a
+pull request. It must retain this licence and all notices. It must not publish compiled
+applications, releases, hosted services, or an independently distributed product.
+
+3. Restrictions
+
+Except for the permissions above, you may not:
+
+* sell, rent, sublicense, or otherwise commercially exploit the Software;
+* redistribute the Software or a modified version, whether as source or binary;
+* publish an application, package, appliance, or hosted service based on the Software;
+* use the Software to provide a paid service or as part of a commercial product; or
+* remove or alter copyright, attribution, licence, or trademark notices.
+
+These restrictions apply whether or not money changes hands. Permission for an
+activity outside this licence requires prior written approval from the Anilife Community
+maintainers.
+
+4. Contributions
+
+By intentionally submitting a contribution to the official Anilife repository, you
+license that contribution to the Anilife Community maintainers under a perpetual,
+worldwide, irrevocable, royalty-free right to use, reproduce, modify, distribute,
+sublicense, and publish it as part of Anilife. You also agree that the contribution may
+be offered to the public under this licence or a later licence selected by those
+maintainers. You represent that you have the right to grant these permissions.
+
+5. Third-party material and trademarks
+
+This licence applies only to material for which the Anilife Community has authority to
+grant rights. Third-party libraries, artwork, fonts, media, APIs, and other components
+remain under their own terms. No trademark rights are granted in the Anilife name,
+logos, or branding.
+
+6. Termination
+
+Your rights under this licence terminate automatically if you breach it. They may be
+restored only by written permission from the Anilife Community maintainers.
+
+7. Disclaimer
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
-INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, TITLE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR
+CONTRIBUTORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF,
+OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+8. Earlier versions
+
+This licence governs this version and later versions that include it. It does not revoke
+permissions already granted for earlier commits or releases under their then-applicable
+licences.

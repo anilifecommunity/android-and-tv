@@ -425,6 +425,7 @@ object DiagnosticsLog {
         context: Context,
         description: String = "",
         screenshot: DiagnosticScreenshot? = null,
+        minimumTimestampUtc: String? = null,
     ): File {
         snapshot(context, "report-generation")
         flush()
@@ -440,6 +441,7 @@ object DiagnosticsLog {
             var eventCount = 0
             val recentLines = ArrayDeque<String>(MAX_RECENT_SUMMARY_EVENTS)
             DiagnosticFileStore.forEachOrderedLine(eventFiles) { line ->
+                if (!diagnosticEventIsAtOrAfter(line, minimumTimestampUtc)) return@forEachOrderedLine
                 eventCount++
                 if (recentLines.size == MAX_RECENT_SUMMARY_EVENTS) recentLines.removeFirst()
                 recentLines.addLast(line)
@@ -467,7 +469,7 @@ object DiagnosticsLog {
             ZipOutputStream(FileOutputStream(temporary).buffered()).use { zip ->
                 zip.putText("manifest.json", DiagnosticEventCodec.encode(manifest))
                 zip.putText("summary.txt", humanSummary(manifest, recentLines.toList(), eventCount, work))
-                zip.putEventLines("events.jsonl", eventFiles)
+                zip.putEventLines("events.jsonl", eventFiles, minimumTimestampUtc)
                 zip.putDiagnosticSubmission(description, screenshot)
                 CrashReporter.pendingReport()?.takeIf(String::isNotBlank)?.let { reportText ->
                     zip.putText("crash.txt", DiagnosticRedactor.redactText(reportText))
@@ -627,11 +629,10 @@ object DiagnosticsLog {
         // fallbacks that decide the layout on a box whose uiMode says NORMAL.
         val television = readTelevisionSignals(context)
         return mapOf(
-            "manufacturer" to Build.MANUFACTURER,
-            "model" to Build.MODEL,
-            "device" to Build.DEVICE,
-            "product" to Build.PRODUCT,
-            "fingerprint" to Build.FINGERPRINT,
+            "manufacturer" to sanitizedDeviceValue(Build.MANUFACTURER),
+            "model" to sanitizedDeviceValue(Build.MODEL),
+            "device" to sanitizedDeviceValue(Build.DEVICE),
+            "product" to sanitizedDeviceValue(Build.PRODUCT),
             "android" to Build.VERSION.RELEASE,
             "sdk" to Build.VERSION.SDK_INT.toString(),
             "securityPatch" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) Build.VERSION.SECURITY_PATCH else "unavailable",
@@ -646,6 +647,12 @@ object DiagnosticsLog {
             "abis" to Build.SUPPORTED_ABIS.joinToString("/"),
         )
     }
+
+    private fun sanitizedDeviceValue(value: String): String = DiagnosticRedactor.redactText(value)
+        .replace(Regex("[\\p{Cc}\\p{Cf}]"), " ")
+        .trim()
+        .take(80)
+        .ifBlank { "unknown" }
 
     private fun networkSnapshot(context: Context): Map<String, String> = runCatching {
         val manager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -964,9 +971,14 @@ object DiagnosticsLog {
         closeEntry()
     }
 
-    private fun ZipOutputStream.putEventLines(name: String, eventFiles: List<File>) {
+    private fun ZipOutputStream.putEventLines(
+        name: String,
+        eventFiles: List<File>,
+        minimumTimestampUtc: String?,
+    ) {
         putNextEntry(ZipEntry(name))
         DiagnosticFileStore.forEachOrderedLine(eventFiles) { line ->
+            if (!diagnosticEventIsAtOrAfter(line, minimumTimestampUtc)) return@forEachOrderedLine
             write(line.toByteArray(StandardCharsets.UTF_8))
             write('\n'.code)
         }

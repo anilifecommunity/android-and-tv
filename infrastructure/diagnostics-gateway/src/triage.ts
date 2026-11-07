@@ -19,7 +19,7 @@ export interface TriageEntry {
 
 export type TriageMap = Record<string, TriageEntry>;
 
-const STORAGE_KEY = "anilili.triage.v1";
+const STORAGE_KEY = "anilife.triage.v1";
 
 export const STATUS_LABEL: Record<ReportStatus, string> = {
   new: "New",

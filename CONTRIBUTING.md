@@ -3,6 +3,11 @@
 Use an existing issue or open a focused proposal before changing application identity, security
 boundaries, providers, update trust, or release behaviour. Small fixes can use the bug template.
 
+By submitting a contribution, you confirm that you have the right to do so and grant the rights
+described in section 4 of the [Anilife Source-Available License 1.0](LICENSE). A public fork may be
+used to prepare a pull request, but it must not publish builds, releases, hosted copies, or an
+independent distribution of Anilife.
+
 ## Development setup
 
 - JDK 17

@@ -40,6 +40,8 @@ jobs:
       MAL_CLIENT_ID: ${{ vars.MAL_CLIENT_ID }}
       SIMKL_CLIENT_ID: ${{ vars.SIMKL_CLIENT_ID }}
       DISCORD_APPLICATION_ID: ${{ vars.DISCORD_APPLICATION_ID }}
+      DISCORD_INVITE_URL: ${{ vars.DISCORD_INVITE_URL }}
+      DIAGNOSTICS_UPLOAD_URL: ${{ vars.DIAGNOSTICS_UPLOAD_URL }}
       OPEN_SUBTITLES_API_KEY: ${{ secrets.OPEN_SUBTITLES_API_KEY }}
       KARTOONS_ACCOUNT_TOKENS: ${{ secrets.KARTOONS_ACCOUNT_TOKENS }}
       KARTOONS_TOKENS_MIRROR_URL: ${{ vars.KARTOONS_TOKENS_MIRROR_URL }}
@@ -132,6 +134,7 @@ jobs:
               sed -n 's/^Signer #1 certificate SHA-256 digest: //p')")
             cp "${matches[0]}" "dist/$name"
           done
+          python scripts/check_elf_alignment.py dist/*.apk
           mapfile -t unique_fingerprints < <(printf '%s\n' "${fingerprints[@]}" | tr '[:upper:]' '[:lower:]' | sort -u)
           test "${#unique_fingerprints[@]}" -eq 1
           test "${unique_fingerprints[0]}" = "${ANDROID_SIGNING_CERT_SHA256,,}"
@@ -141,6 +144,7 @@ jobs:
           version_code="$(sed -n "s/^package:.*versionCode='\([^']*\)'.*/\1/p" <<<"$package_line")"
           test -n "$app_version"
           test -n "$version_code"
+          test "$RELEASE_TAG" = "v$app_version"
           for flavor in mobile tv; do
             mapping="app/build/outputs/mapping-archive/mapping-$flavor-v$app_version-$version_code-${GITHUB_SHA:0:12}.txt"
             test -s "$mapping"

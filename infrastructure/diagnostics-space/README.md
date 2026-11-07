@@ -1,17 +1,17 @@
 ---
-title: Anilili Diagnostics
+title: Anilife Diagnostics
 emoji: 🛠️
 colorFrom: purple
 colorTo: indigo
 sdk: gradio
 app_file: app.py
 pinned: false
-license: mit
+license: other
 ---
 
-# Anilili Diagnostics Receiver
+# Anilife Diagnostics Receiver
 
-CPU-only receiver for user-approved Anilili diagnostic reports. The public service exposes only
+CPU-only receiver for user-approved Anilife diagnostic reports. The public service exposes only
 health information and the upload endpoint. Reports are stored in a private Hugging Face Storage
 Bucket mounted at `/data`; there is no public report index or download route.
 

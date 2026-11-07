@@ -640,7 +640,7 @@ object PipeBridge {
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
-                DiagnosticsLog.event("PipeBridge page finished: ${url ?: "unknown"} title=${view?.title ?: "none"}")
+                DiagnosticsLog.event("PipeBridge page finished: ${url ?: "unknown"}")
                 Log.d(TAG, "onPageFinished: $url  title=${view?.title}")
                 if (url == null || !url.startsWith(activeOrigin)) return
                 main.removeCallbacks(mirrorWatchdog)

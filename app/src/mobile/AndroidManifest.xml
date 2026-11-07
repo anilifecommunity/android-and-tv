@@ -5,7 +5,8 @@
     session between the phone and a Cast route — both are meaningless without the Cast stack,
     which the TV flavor does not build against.
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
         Held only while the phone is browsing for a television to sign in. NsdManager itself needs
@@ -22,7 +23,8 @@
 
         <receiver
             android:name="androidx.mediarouter.media.MediaTransferReceiver"
-            android:exported="true" />
+            android:exported="true"
+            tools:ignore="ExportedReceiver" />
 
         <!--
             The app icon follows the theme's accent preset (IconVariants.kt). A launcher icon cannot

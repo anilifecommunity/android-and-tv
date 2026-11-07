@@ -1,0 +1,44 @@
+---
+title: "Update Anilife safely"
+sidebarTitle: "Updates"
+description: "Check for signed Anilife updates, choose between stable and beta channels, and understand how urgent corrective builds reach devices."
+icon: "refresh-cw"
+keywords:
+  - "Anilife updates"
+  - "beta updates"
+  - "stable releases"
+  - "signed APK"
+---
+
+Anilife checks its signed update sources and downloads the build made for your device. Stable updates are the default, while beta releases are optional tester builds.
+
+## Choose an update channel
+
+- **Stable:** Leave **Settings → App → Receive beta updates** off. The app checks only full releases.
+- **Beta:** Turn **Receive beta updates** on. The app checks beta releases as well as stable releases. This setting is off by default.
+
+<Warning>
+  Beta builds may be less stable. Use them when you intend to test and report problems.
+</Warning>
+
+## Check manually
+
+<Steps>
+  <Step title="Open App settings">
+    Open **Settings**, then choose **App**.
+  </Step>
+  <Step title="Choose the channel">
+    Set **Receive beta updates** to your preferred channel.
+  </Step>
+  <Step title="Run the check">
+    Select **Check for updates**. If a build is available, review the version and install prompt.
+  </Step>
+</Steps>
+
+**Check for updates on launch** controls whether Anilife prompts automatically when a new version is available. Turning it off does not remove the manual check.
+
+A small corrective build can keep the same visible version and use a higher Android build number. Anilife shows that build in Settings so existing users can receive urgent fixes without an unnecessary new version name.
+
+## Installation protection
+
+Anilife verifies update metadata before offering a download. Android also requires an update APK to use the same application signing identity as the installed app and refuses a lower build number. If installation is refused, do not remove the installed app until you have protected any local data you need.

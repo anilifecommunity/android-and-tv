@@ -142,6 +142,9 @@ class MiruroApp : Application(), ImageLoaderFactory {
             com.anilili.data.auth.OpenSubtitlesAuthManager.init(this, AppGraph.openSubtitles)
         }
         diagnosticsStep("SettingsStore.init") { SettingsStore.init(this) }
+        diagnosticsStep("DiagnosticsUploadManager.init") {
+            com.anilili.diagnostics.DiagnosticsUploadManager.init(this)
+        }
         diagnosticsStep("DiscordAuthManager.init") {
             com.anilili.data.discord.DiscordAuthManager.init(this, AppGraph.httpClient)
         }

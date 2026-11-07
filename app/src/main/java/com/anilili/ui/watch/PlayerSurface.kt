@@ -2064,7 +2064,7 @@ fun PlayerSurface(
                 !inPictureInPicture,
             seriesTitle = seriesTitle,
             episodeTitle = episodeTitle,
-            // The server's display name, not its id: "xfdm" is what the code calls Lili.
+            // Show the provider's user-facing label rather than its internal server id.
             providerName = ProviderCatalog.label(provider),
             description = pauseDescription,
         )

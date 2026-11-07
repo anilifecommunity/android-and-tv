@@ -1,8 +1,14 @@
 # Diagnostics and privacy
 
-Anilife creates a diagnostic report only when a user chooses **Send diagnostics** or approves the
-crash-report prompt. The app then opens Android's share sheet; the user chooses whether and where
-to send the ZIP. Anilife has no background diagnostics uploader or private report service.
+Diagnostic collection is local by default. A report leaves the device only when the user exports
+or uploads one manually, approves the crash-report prompt, or explicitly enables the separate
+**Automatically upload diagnostics** setting. That setting is off by default.
+
+Enabling automatic upload starts a new consent window: events recorded before consent are excluded.
+The app schedules at most one daily report, retains a staged report unchanged across safe retries,
+and accepts success only when the service returns the same report ID. Turning the setting off
+cancels queued work and removes staged reports. Accepted uploads are private and expire after 30
+days. Local export remains available for review or sharing without enabling uploads.
 
 Manual reports ask the user to describe the problem. A JPEG, PNG or WebP screenshot up to 5 MB can
 also be selected explicitly; it is never captured automatically. The description and screenshot
@@ -22,7 +28,7 @@ slugs and other sensitive content identifiers. Screenshots can contain whatever 
 selected image, so the UI warns users to attach only content they intend to send. Raw IP addresses
 are not stored.
 
-Generated ZIPs remain in Android's disposable app cache for up to 24 hours so the selected share
-target can read them. Android may clear them sooner under storage pressure, and the app removes old
-reports the next time it creates one. Once the user shares a ZIP, retention and delivery are
-controlled by the app they selected.
+Generated share-sheet ZIPs remain in Android's disposable app cache for up to 24 hours so the
+selected target can read them. Android may clear them sooner under storage pressure, and the app
+removes old reports the next time it creates one. Once the user shares a ZIP through another app,
+retention and delivery are controlled by that app.

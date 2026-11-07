@@ -200,25 +200,39 @@ class DiscordPresencePayloadTest {
     }
 
     @Test
-    fun `the button opens the Anilife project`() {
+    fun `the button opens the configured Anilife Discord invite`() {
         val activity = payload(watching()).activity()
 
-        assertEquals("Get Anilife", activity.getJSONArray("buttons").getString(0))
-        assertEquals(
-            "https://github.com/anilifecommunity/android-and-tv",
-            activity.getJSONObject("metadata").getJSONArray("button_urls").getString(0),
-        )
+        if (WATCH_BUTTON_URL != null) {
+            assertEquals("Get Anilife", activity.getJSONArray("buttons").getString(0))
+            assertEquals(
+                WATCH_BUTTON_URL,
+                activity.getJSONObject("metadata").getJSONArray("button_urls").getString(0),
+            )
+        } else {
+            assertFalse(activity.has("buttons"))
+            assertFalse(activity.has("metadata"))
+        }
     }
 
     @Test
     fun `the watch button does not depend on an AniList id`() {
         val activity = payload(watching(anilistId = 0)).activity()
 
-        assertEquals(1, activity.getJSONArray("buttons").length())
+        assertEquals(WATCH_BUTTON_URL != null, activity.has("buttons"))
+    }
+
+    @Test
+    fun `only official https Discord invite URLs are accepted`() {
+        assertEquals("https://discord.gg/anilife", validatedDiscordInviteUrl("https://discord.gg/anilife"))
         assertEquals(
-            "https://github.com/anilifecommunity/android-and-tv",
-            activity.getJSONObject("metadata").getJSONArray("button_urls").getString(0),
+            "https://discord.com/invite/anilife",
+            validatedDiscordInviteUrl("https://discord.com/invite/anilife"),
         )
+        assertNull(validatedDiscordInviteUrl("https://github.com/anilifecommunity"))
+        assertNull(validatedDiscordInviteUrl("http://discord.gg/anilife"))
+        assertNull(validatedDiscordInviteUrl("https://discord.gg"))
+        assertNull(validatedDiscordInviteUrl("https://discord.gg.evil.test/anilife"))
     }
 
     /** Discord drops a field under two characters rather than rendering it, so it is not sent. */

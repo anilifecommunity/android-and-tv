@@ -36,17 +36,17 @@ permissions:
 
 jobs:
   refresh:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 330
     steps:
       # Depth 2, not 1: the purge step diffs HEAD~1 against HEAD to find what changed, and a depth-1
       # clone has no HEAD~1. Full history is ~60,000 files a day of churn and would make the daily
       # clone the slowest step in the job.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 2
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
@@ -56,7 +56,7 @@ jobs:
 
       # Cached so an interrupted or rate-limited run resumes instead of re-walking AniList from
       # 1900. The key rotates daily so the cache never outlives the data in it.
-      - uses: actions/cache@v4
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: build/konoha
           key: konoha-work-${{ github.run_id }}
@@ -146,7 +146,7 @@ jobs:
 
       # ~440MB, published weekly, so six days out of seven this is a cache hit. Keyed on the asset
       # name rather than the date so a skipped week reuses the copy already here.
-      - uses: actions/cache@v4
+      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: build/bangumi
           key: bangumi-dump-${{ steps.bgmdump.outputs.name }}
@@ -175,7 +175,7 @@ jobs:
       # refuses it, so a restaged season costs one failed play rather than going quiet.
       #
       # Must run after `Join to Bangumi`: the crawl is keyed on the subject id that step writes.
-      - name: Resolve Lili streams
+      - name: Resolve precomputed streams
         run: |
           python scripts/lili_sources.py --repo . --top 200 --concurrency 4 \
             --skip-fresh-days 30 --write

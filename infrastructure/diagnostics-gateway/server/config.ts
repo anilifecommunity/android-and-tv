@@ -14,7 +14,9 @@ export const MAX_BYTES_PER_DAY = 2_000_000_000;
 
 export interface RuntimeConfig {
   adminAccessKey: string;
-  rateLimitSecret: string;
+  turnstileSecret: string;
+  turnstileSiteKey: string;
+  turnstileHostname: string;
   tempDirectory: string;
   secureCookies: boolean;
 }
@@ -22,7 +24,9 @@ export interface RuntimeConfig {
 export function runtimeConfig(overrides: Partial<RuntimeConfig> = {}): RuntimeConfig {
   const config: RuntimeConfig = {
     adminAccessKey: process.env.ADMIN_ACCESS_KEY ?? "",
-    rateLimitSecret: process.env.RATE_LIMIT_SECRET ?? "",
+    turnstileSecret: process.env.TURNSTILE_SECRET ?? "",
+    turnstileSiteKey: process.env.TURNSTILE_SITE_KEY ?? "",
+    turnstileHostname: process.env.TURNSTILE_HOSTNAME ?? "",
     tempDirectory: resolve(process.env.DIAGNOSTICS_TEMP_DIR ?? tmpdir()),
     secureCookies: process.env.NODE_ENV === "production",
     ...overrides,
@@ -30,8 +34,8 @@ export function runtimeConfig(overrides: Partial<RuntimeConfig> = {}): RuntimeCo
   if (config.adminAccessKey.length < 24) {
     throw new Error("ADMIN_ACCESS_KEY must contain at least 24 characters");
   }
-  if (config.rateLimitSecret.length < 24) {
-    throw new Error("RATE_LIMIT_SECRET must contain at least 24 characters");
+  if (!config.turnstileSecret || !config.turnstileSiteKey || !config.turnstileHostname) {
+    throw new Error("Turnstile configuration is required");
   }
   return config;
 }

@@ -36,6 +36,16 @@ class DiagnosticRedactorTest {
     }
 
     @Test
+    fun `an unquoted page title is redacted as one value`() {
+        val result = DiagnosticRedactor.redactText(
+            "EmbedWebView page finished host=example.test title=A Silent Voice - Watch Online",
+        )
+
+        assertEquals("EmbedWebView page finished host=example.test title=<redacted>", result)
+        assertFalse(result.contains("Silent Voice"))
+    }
+
+    @Test
     fun `structured attributes redact by key but keep useful host and timing`() {
         val result = DiagnosticRedactor.redactAttributes(
             mapOf(

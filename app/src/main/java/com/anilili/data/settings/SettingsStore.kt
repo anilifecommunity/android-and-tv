@@ -201,6 +201,16 @@ enum class FormFactorPreference(val storedValue: String, val label: String) {
     }
 }
 
+enum class AppLayoutMode(val storedValue: String, val label: String) {
+    LEGACY("legacy", "Legacy"),
+    CINEMA("cinema", "Cinema");
+
+    companion object {
+        fun fromStored(value: String?): AppLayoutMode =
+            entries.firstOrNull { it.storedValue == value } ?: LEGACY
+    }
+}
+
 /**
  * Which dub to take when a stream carries several, as many multi-audio sources do.
  *
@@ -1145,6 +1155,9 @@ object SettingsStore {
     private val _formFactorPreference = MutableStateFlow(FormFactorPreference.AUTOMATIC)
     val formFactorPreference = _formFactorPreference.asStateFlow()
 
+    private val _appLayoutMode = MutableStateFlow(AppLayoutMode.LEGACY)
+    val appLayoutMode = _appLayoutMode.asStateFlow()
+
     /**
      * Whether this device has ever launched the app from a television home screen.
      *
@@ -1694,6 +1707,11 @@ object SettingsStore {
         scope.launch { store.edit { it[FORM_FACTOR_PREFERENCE] = value.storedValue } }
     }
 
+    fun setAppLayoutMode(value: AppLayoutMode) {
+        _appLayoutMode.value = value
+        scope.launch { store.edit { it[APP_LAYOUT_MODE] = value.storedValue } }
+    }
+
     /**
      * The resolver is switched here rather than left to [applyPreferences], which would only reach
      * it once the write has been round-tripped through disk. The picker stays open on purpose so a
@@ -2075,6 +2093,7 @@ object SettingsStore {
         _appBackdropDim.value = AppBackdropDim.fromStored(prefs[APP_BACKDROP_DIM])
         _appBackdropBlur.value = prefs[APP_BACKDROP_BLUR] ?: true
         _formFactorPreference.value = FormFactorPreference.fromStored(prefs[FORM_FACTOR_PREFERENCE])
+        _appLayoutMode.value = AppLayoutMode.fromStored(prefs[APP_LAYOUT_MODE])
         _leanbackLauncherSeen.value = prefs[LEANBACK_LAUNCHER_SEEN] ?: false
         // Both of the above feed AppGraph.isTv, which was seeded from the device's signals alone on
         // the startup path — this file had not been read yet. Now it has.
@@ -2249,6 +2268,7 @@ object SettingsStore {
     private val APP_BACKDROP_DIM = stringPreferencesKey("app_backdrop_dim")
     private val APP_BACKDROP_BLUR = booleanPreferencesKey("app_backdrop_blur")
     private val FORM_FACTOR_PREFERENCE = stringPreferencesKey("form_factor_preference")
+    private val APP_LAYOUT_MODE = stringPreferencesKey("app_layout_mode")
     private val LEANBACK_LAUNCHER_SEEN = booleanPreferencesKey("leanback_launcher_seen")
     private val DOWNLOAD_QUALITY = stringPreferencesKey("download_quality")
     private val DOWNLOAD_DESTINATION = stringPreferencesKey("download_destination")
@@ -2368,6 +2388,7 @@ object SettingsStore {
         listOf(DEFAULT_PLAYBACK_SPEED_KEY, HOLD_PLAYBACK_SPEED, PLAYER_BRIGHTNESS)
 
     private val BACKUP_STRING_KEYS = listOf(
+        APP_LAYOUT_MODE,
         EPISODE_DRAWER_LAYOUT,
         CAPTION_BACKGROUND_COLOR,
         CAPTION_POSITION,

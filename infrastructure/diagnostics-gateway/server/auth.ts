@@ -2,7 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import type { RuntimeConfig } from "./config.js";
 
-const COOKIE_NAME = "anilili_diagnostics_admin";
+const COOKIE_NAME = "anilife_diagnostics_admin";
 const SESSION_SECONDS = 8 * 60 * 60;
 
 function constantTimeEqual(left: string, right: string): boolean {
@@ -68,7 +68,7 @@ export function requireAdmin(config: RuntimeConfig) {
 }
 
 export function requireAdminMutation(request: Request, response: Response, next: NextFunction): void {
-  if (request.get("X-Anilili-Admin") !== "1") {
+  if (request.get("X-Anilife-Admin") !== "1") {
     response.status(403).json({ error: "Missing administrator request proof" });
     return;
   }

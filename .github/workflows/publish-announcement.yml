@@ -1,0 +1,140 @@
+name: Publish signed announcement
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Publish a message or retract the current one
+        required: true
+        default: publish
+        type: choice
+        options:
+          - publish
+          - retract
+      id:
+        description: Stable message ID; reuse to correct silently, change to notify again
+        required: false
+        type: string
+      title:
+        description: Notification title
+        required: false
+        default: Anilife
+        type: string
+      message:
+        description: Notification body
+        required: false
+        type: string
+      url:
+        description: Optional HTTPS destination
+        required: false
+        type: string
+      url_label:
+        description: Optional button label
+        required: false
+        type: string
+      severity:
+        description: Emergency uses the high-importance notification channel
+        required: true
+        default: normal
+        type: choice
+        options:
+          - normal
+          - emergency
+      expires_in_days:
+        description: Days before the announcement expires
+        required: true
+        default: "2"
+        type: string
+      min_version:
+        description: Optional minimum app version
+        required: false
+        type: string
+      max_version:
+        description: Optional maximum app version
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-announcement
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    env:
+      GH_TOKEN: ${{ github.token }}
+      OPERATION: ${{ inputs.operation }}
+      ANNOUNCEMENT_ID: ${{ inputs.id }}
+      ANNOUNCEMENT_TITLE: ${{ inputs.title }}
+      ANNOUNCEMENT_MESSAGE: ${{ inputs.message }}
+      ANNOUNCEMENT_URL: ${{ inputs.url }}
+      ANNOUNCEMENT_URL_LABEL: ${{ inputs.url_label }}
+      ANNOUNCEMENT_SEVERITY: ${{ inputs.severity }}
+      EXPIRES_IN_DAYS: ${{ inputs.expires_in_days }}
+      MIN_VERSION: ${{ inputs.min_version }}
+      MAX_VERSION: ${{ inputs.max_version }}
+    steps:
+      - name: Check out publisher
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: scripts/update-requirements.txt
+
+      - name: Sign and validate announcement
+        shell: bash
+        env:
+          NOSTR_UPDATE_SECRET: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --require-hashes \
+            -r scripts/update-requirements.txt
+
+          if [[ "$OPERATION" = retract ]]; then
+            python scripts/nostr_update.py announce-clear \
+              --write-event announcement.json --dry-run
+          else
+            test -n "$ANNOUNCEMENT_ID"
+            test -n "$ANNOUNCEMENT_MESSAGE"
+            [[ "$EXPIRES_IN_DAYS" =~ ^[1-9][0-9]*$ ]]
+            args=(
+              announce
+              --id "$ANNOUNCEMENT_ID"
+              --title "$ANNOUNCEMENT_TITLE"
+              --message "$ANNOUNCEMENT_MESSAGE"
+              --expires-in-days "$EXPIRES_IN_DAYS"
+              --write-event announcement.json
+              --dry-run
+            )
+            [[ -z "$ANNOUNCEMENT_URL" ]] || args+=(--url "$ANNOUNCEMENT_URL")
+            [[ -z "$ANNOUNCEMENT_URL_LABEL" ]] || args+=(--url-label "$ANNOUNCEMENT_URL_LABEL")
+            [[ "$ANNOUNCEMENT_SEVERITY" != emergency ]] || args+=(--emergency)
+            [[ -z "$MIN_VERSION" ]] || args+=(--min-version "$MIN_VERSION")
+            [[ -z "$MAX_VERSION" ]] || args+=(--max-version "$MAX_VERSION")
+            python scripts/nostr_update.py "${args[@]}"
+          fi
+
+          jq -e '
+            .pubkey == "dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c" and
+            (.tags | any(. == ["d", "anilife-announcement"])) and
+            (.content | fromjson | .message | length > 0)
+          ' announcement.json >/dev/null
+
+      - name: Mirror and broadcast signed announcement
+        shell: bash
+        run: |
+          set -euo pipefail
+          latest_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          gh release upload "$latest_tag" announcement.json --clobber
+          python scripts/nostr_update.py broadcast-file announcement.json
