@@ -59,7 +59,8 @@ Each release contains six APKs:
 | TV | `Anilife_tv.apk` | `Anilife_tv_arm64-v8a.apk` | `Anilife_tv_armeabi-v7a.apk` |
 
 Release bundles also include checksums, an SBOM, build provenance, signing-certificate metadata,
-and R8 mapping files. The [release runbook](docs/release/runbook.md) defines the maintainer checks.
+and R8 mapping files. The [changelog](CHANGELOG.md) records every published version and the next
+unreleased build. The [release runbook](docs/release/runbook.md) defines the maintainer checks.
 
 Stable updates are checked by default. Testers who install a prerelease can opt into later beta
 builds in **Settings → App → Receive beta updates**; turning it off returns checks to stable
