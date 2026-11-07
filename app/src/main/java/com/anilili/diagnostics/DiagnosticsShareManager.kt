@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 enum class DiagnosticTrigger(val logValue: String) {
     MANUAL("manual"),
+    DAILY("daily"),
     CRASH("crash"),
     SLOW_START("slow_start"),
     SHORTCUT("shortcut"),

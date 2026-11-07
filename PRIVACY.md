@@ -6,9 +6,12 @@ sync, update checks, and explicitly submitted diagnostics.
 
 ## Diagnostics
 
-Diagnostic collection is local by default. A report is transmitted only after the user opens the
-diagnostic flow and chooses to submit it. Reports should be reviewed before sharing and must not
-include account tokens, cookies, private media URLs, or unnecessary personal information.
+Diagnostic collection is local by default. A report is transmitted only when the user uploads one
+manually or explicitly enables the off-by-default daily upload option. Enabling automatic uploads
+starts a new consent window: events recorded before that point are excluded, disabling it cancels
+queued work and deletes staged uploads, and accepted reports are retained privately for 30 days.
+Local export remains available for review before sharing. Reports must not include account tokens,
+cookies, private media URLs, or unnecessary personal information.
 
 ## Accounts and configuration
 

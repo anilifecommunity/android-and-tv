@@ -668,8 +668,7 @@ fun LoginWebView(
                                     if (url == "about:blank") return
                                     markPageUsable(view, url, "finished")
                                     DiagnosticsLog.event(
-                                        "LoginWebView page finished host=${url.oauthHost()} " +
-                                            "title=${view?.title ?: "none"}",
+                                        "LoginWebView page finished host=${url.oauthHost()}",
                                     )
                                 }
 

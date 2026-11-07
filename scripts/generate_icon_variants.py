@@ -78,6 +78,13 @@ def on_black(image: Image.Image) -> Image.Image:
     return canvas.convert("RGB")
 
 
+def round_on_black(image: Image.Image) -> Image.Image:
+    canvas = Image.new("RGBA", image.size)
+    ImageDraw.Draw(canvas).ellipse((0, 0, image.width - 1, image.height - 1), fill="#0B0B0F")
+    canvas.alpha_composite(image)
+    return canvas
+
+
 def wordmark(width: int, height: int, mark_size: int, font_size: int) -> Image.Image:
     canvas = Image.new("RGBA", (width, height))
     logo = mark(mark_size, 0.92)
@@ -102,14 +109,17 @@ def main() -> None:
     foreground.save(RES / "drawable" / "anilili_launcher.png", optimize=True)
     icon = on_black(mark(1024))
     icon.save(ROOT / "docs" / "assets" / "icon.png", optimize=True)
-    on_black(mark(320)).save(APP / "tv" / "res" / "drawable-nodpi" / "tv_launcher_icon.png", optimize=True)
+    round_on_black(mark(320, 0.72)).save(
+        APP / "tv" / "res" / "drawable-nodpi" / "tv_launcher_icon.png",
+        optimize=True,
+    )
     wordmark(546, 130, 120, 76).save(RES / "drawable-nodpi" / "anilili_header_wordmark.png", optimize=True)
     banner = Image.new("RGBA", (320, 180))
     banner.alpha_composite(wordmark(304, 120, 108, 43), (8, 30))
     banner.save(RES / "drawable-nodpi" / "tv_banner_art.png", optimize=True)
 
     for density, size in DENSITY_SIZES.items():
-        base = on_black(mark(size))
+        base = round_on_black(mark(size, 0.72))
         base.save(RES / f"mipmap-{density}" / "ic_launcher.png", optimize=True)
         base.save(RES / f"mipmap-{density}" / "ic_launcher_round.png", optimize=True)
 

@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 12+ shows this static brand frame until the supplied startup animation is ready. -->
+    <!-- Keep the platform hand-off black and unbranded; Compose owns the one launch logo. -->
     <style name="Theme.MiruroNative" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@color/miruro_bg</item>
         <item name="android:navigationBarColor">@color/miruro_bg</item>
-        <item name="android:windowBackground">@color/miruro_bg</item>
+        <item name="android:windowBackground">@color/black</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowSplashScreenBackground">@color/miruro_bg</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_vessel</item>
+        <item name="android:windowSplashScreenBackground">@color/black</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_transparent</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
     </style>
 </resources>

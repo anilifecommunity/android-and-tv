@@ -1217,7 +1217,7 @@ fun EmbedWebView(
             override fun onPageFinished(view: WebView?, url: String?) {
                 navigationLock.locked = true
                 finishedUrl = url
-                DiagnosticsLog.event("EmbedWebView page finished host=${url.hostOrNone()} title=${view?.title ?: "none"}")
+                DiagnosticsLog.event("EmbedWebView page finished host=${url.hostOrNone()}")
                 // Fallback for old WebView providers without DOCUMENT_START_SCRIPT. This can only
                 // reach the main document; supported providers get every frame at document start.
                 view?.evaluateJavascript(HIDE_PROVIDER_CHROME_JS, null)

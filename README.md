@@ -1,7 +1,7 @@
 # Anilife for Android and TV
 
 <p align="center">
-  <img src="docs/assets/icon.png" width="160" alt="Anilife logo">
+  <img src="docs/assets/anilife-logo-round-transparent.png" width="160" alt="Anilife logo">
 </p>
 
 <p align="center">
@@ -68,9 +68,10 @@ build number, so installed users can still receive urgent fixes.
 
 ## Privacy and security
 
-Anilife does not send analytics or usage telemetry. Diagnostic reports are created and shared only
-when a user chooses to do so, and should be reviewed before attachment. Optional integrations fail
-closed when their public identifiers are not configured.
+Anilife does not send analytics or usage telemetry. Diagnostic reports stay on the device unless a
+user exports one, uploads one manually, or explicitly enables the off-by-default daily upload
+option. Automatic reports include only events recorded after consent and are retained privately for
+30 days. Optional integrations fail closed when their public identifiers are not configured.
 
 Report security vulnerabilities privately through
 [GitHub Security Advisories](https://github.com/anilifecommunity/android-and-tv/security/advisories/new).
@@ -79,7 +80,8 @@ identifiers, and personal data from logs or screenshots.
 
 See [PRIVACY.md](PRIVACY.md), [SUPPORT.md](SUPPORT.md), and the
 [compatibility guide](docs/COMPATIBILITY.md) for the current user-facing policies. Brand artwork
-provenance is recorded in [docs/ASSET-LICENCES.md](docs/ASSET-LICENCES.md).
+provenance is recorded in [docs/ASSET-LICENCES.md](docs/ASSET-LICENCES.md), and the redacted
+service and release authority map is in [docs/OWNERSHIP.md](docs/OWNERSHIP.md).
 
 ## Contributing
 
@@ -89,7 +91,10 @@ and the [post-candidate milestone](https://github.com/anilifecommunity/android-a
 
 ## Licence and content boundary
 
-Repository code is available under MIT No Attribution (`MIT-0`). That licence does not grant
-rights to third-party anime, artwork, subtitles, streams, trademarks, or provider APIs. Users and
-distributors are responsible for complying with applicable licences, service terms, privacy
-obligations, and copyright law.
+Anilife is source-available under the [Anilife Source-Available License 1.0](LICENSE). Personal,
+non-commercial use and contribution forks are permitted; redistribution, sale, commercial use,
+independent releases, and hosted copies are not. This is not an OSI-approved open-source licence.
+Earlier commits and releases keep the licence under which they were originally published.
+
+Third-party anime, artwork, subtitles, streams, libraries, trademarks, and provider APIs remain
+under their own terms. The repository licence grants no rights to that material.

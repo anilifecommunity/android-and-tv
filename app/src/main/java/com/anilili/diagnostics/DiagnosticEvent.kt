@@ -66,3 +66,7 @@ internal object DiagnosticEventCodec {
         json.parseToJsonElement(line).jsonObject["timestampUtc"]?.jsonPrimitive?.content
     }.getOrNull()
 }
+
+internal fun diagnosticEventIsAtOrAfter(line: String, minimumTimestampUtc: String?): Boolean =
+    minimumTimestampUtc == null ||
+        (DiagnosticEventCodec.timestampOf(line)?.let { it >= minimumTimestampUtc } == true)

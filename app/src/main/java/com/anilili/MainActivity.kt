@@ -25,6 +25,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -58,6 +59,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -67,6 +69,7 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -150,6 +153,7 @@ import com.anilili.data.remote.PaheBridge
 import com.anilili.data.remote.PipeBridge
 import com.anilili.data.remote.canHostPipeEngine
 import com.anilili.data.settings.MenuLanguage
+import com.anilili.data.settings.AppLayoutMode
 import com.anilili.data.settings.SettingsStore
 import com.anilili.data.update.UpdateManager
 import com.anilili.diagnostics.CrashReportDialog
@@ -198,6 +202,7 @@ import com.anilili.ui.components.LocalAppChromeTakeover
 import com.anilili.ui.components.AppLaunchSplash
 import com.anilili.ui.components.VideoLaunchSplash
 import com.anilili.ui.components.VideoLaunchSplashExitMillis
+import com.anilili.ui.components.launchIntroResource
 import com.anilili.ui.components.FloatingNavBarExpandedHeight
 import com.anilili.ui.components.FloatingNavBarMargin
 import com.anilili.ui.components.FloatingNavItem
@@ -210,6 +215,7 @@ import com.anilili.ui.components.LocalAppChromeReveal
 import com.anilili.ui.components.LocalAppChromeVisible
 import com.anilili.ui.components.LocalSystemUses24Hour
 import com.anilili.ui.components.LocalTimeOfDayFormatter
+import com.anilili.ui.components.LocalTvTopNavigationVisible
 import com.anilili.ui.components.TvTopNavigationHeight
 import com.anilili.ui.components.TvTopNavigationInset
 import com.anilili.ui.components.rememberSystemUses24Hour
@@ -363,6 +369,11 @@ class MainActivity : FragmentActivity() {
                                     } ?: false
                                 }
                             }
+                            val themeAccent by SettingsStore.themeAccent.collectAsState()
+                            val introResource = launchIntroResource(
+                                themeAccent,
+                                MaterialTheme.colorScheme.primary.toArgb(),
+                            )
                             AnimatedVisibility(
                                 visibleState = launchSplashState,
                                 modifier = Modifier.fillMaxSize(),
@@ -381,7 +392,10 @@ class MainActivity : FragmentActivity() {
                                 when (videoIntro) {
                                     // The window's own colour, which the mark's splash also opens on.
                                     null -> Box(Modifier.fillMaxSize().background(ComposeColor(0xFF0B0B0F)))
-                                    true -> VideoLaunchSplash(onFinished = { showLaunchSplash = false })
+                                    true -> VideoLaunchSplash(
+                                        onFinished = { showLaunchSplash = false },
+                                        introResource = introResource,
+                                    )
                                     false -> AppLaunchSplash(onFinished = { showLaunchSplash = false })
                                 }
                             }
@@ -660,7 +674,7 @@ private fun View.visibilityName(): String = when (visibility) {
     else -> visibility.toString()
 }
 
-private enum class Tab(
+internal enum class Tab(
     val route: String,
     private val englishLabel: String,
     private val spanishLabel: String,
@@ -696,7 +710,18 @@ private enum class Tab(
  * Schedule is not here: it belongs to Home, whose top bar is where it sits. Five destinations is
  * what the icon-only bar holds with comfortable touch targets on narrow phones.
  */
-private val phoneTabs = listOf(Tab.HOME, Tab.SEARCH, Tab.DOWNLOADS, Tab.MORE, Tab.SETTINGS)
+internal val phoneTabs = listOf(Tab.HOME, Tab.SEARCH, Tab.DOWNLOADS, Tab.MORE, Tab.SETTINGS)
+internal val cinemaTabs = listOf(Tab.HOME, Tab.MORE, Tab.SEARCH, Tab.SCHEDULE, Tab.SETTINGS)
+
+internal fun Tab.navigationLabel(language: MenuLanguage, cinema: Boolean): String = when {
+    !cinema -> label(language)
+    this == Tab.SEARCH -> if (language.usesSpanish()) "Explorar" else "Browse"
+    this == Tab.SETTINGS -> if (language.usesSpanish()) "Perfil" else "Profile"
+    else -> label(language)
+}
+
+private fun Tab.navigationIcon(cinema: Boolean): ImageVector =
+    if (cinema && this == Tab.SETTINGS) Icons.Default.Person else icon
 
 /**
  * Room the floating phone navigation capsule occupies above the system navigation inset — the
@@ -730,6 +755,10 @@ private fun MiruroRoot(
     // lit on it, because it belongs to whichever tab the viewer came from.
     val showPhoneNavigation = showBottomBar || currentRoute == Routes.DETAIL
     val menuLanguage by SettingsStore.menuLanguage.collectAsState()
+    val appLayoutMode by SettingsStore.appLayoutMode.collectAsState()
+    val cinema = appLayoutMode == AppLayoutMode.CINEMA
+    val navigationTabs = if (cinema) cinemaTabs else phoneTabs
+    val railTabs = if (cinema) cinemaTabs else Tab.entries
     var chromeVisible by remember { mutableStateOf(true) }
     val tvSearchRailFocusRequester = remember { FocusRequester() }
     // Redirect destinations, not plain requesters: both live on screens that are only composed on
@@ -801,10 +830,11 @@ private fun MiruroRoot(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(deviceProfile, appLayoutMode) {
         DiagnosticsLog.event(
             "MiruroRoot composed formFactor=${deviceProfile.formFactor} " +
                 "widthDp=${deviceProfile.widthDp} navRail=${deviceProfile.useNavigationRail} " +
+                "layoutMode=${appLayoutMode.storedValue} " +
                 // Which fact decided it, so a report of the wrong layout says whether the device
                 // claimed nothing or whether the app ignored what it claimed.
                 "televisionSignal=${deviceProfile.televisionSignal ?: "none"}",
@@ -916,6 +946,7 @@ private fun MiruroRoot(
         },
         LocalSystemUses24Hour provides systemUses24Hour,
         LocalTimeOfDayFormatter provides timeOfDayFormatter(clockFormat, systemUses24Hour),
+        LocalTvTopNavigationVisible provides !cinema,
         LocalAppChromeVisible provides (chromeVisible || deviceProfile.isTv),
         LocalAppChromeReveal provides revealChrome,
         LocalAppChromeBottomInset provides if (hasPhoneBottomBarForChrome) {
@@ -943,11 +974,11 @@ private fun MiruroRoot(
             // themselves: an anime page shows the capsule too, but a swipe there is not a request
             // to leave it for the tab beside Home.
             val tabSwipe = rememberTabSwipeState()
-            val swipeTabIndex = phoneTabs.indexOfFirst { it.route == currentRoute }
+            val swipeTabIndex = navigationTabs.indexOfFirst { it.route == currentRoute }
             Scaffold(
                 containerColor = canvasColor(),
             ) { innerPadding ->
-                val showTvTopNavigation = deviceProfile.isTv &&
+                val showTvTopNavigation = deviceProfile.isTv && !cinema &&
                     (showBottomBar || currentRoute == Routes.DETAIL)
                 // The canvas is painted inside the capsule's blur source, so the glass frosts the
                 // background picture too rather than showing it sharp through a tint.
@@ -959,10 +990,13 @@ private fun MiruroRoot(
                                 bottom = if (hasPhoneBottomBar) 0.dp else innerPadding.calculateBottomPadding(),
                             ),
                     ) {
-                        if (showPhoneNavigation && deviceProfile.useNavigationRail && !deviceProfile.isTv) {
+                        if (showPhoneNavigation && (deviceProfile.useNavigationRail && !deviceProfile.isTv ||
+                                deviceProfile.isTv && cinema)) {
                             AppNavigationRail(
                                 currentRoute = currentRoute,
                                 menuLanguage = menuLanguage,
+                                tabs = railTabs,
+                                cinema = cinema,
                                 onNavigate = nav::navigateTab,
                                 searchRailFocusRequester = tvSearchRailFocusRequester,
                                 searchFieldFocusTarget = tvSearchFieldFocusTarget,
@@ -987,9 +1021,9 @@ private fun MiruroRoot(
                                     state = tabSwipe,
                                     enabled = showPhoneCapsule && swipeTabIndex >= 0,
                                     hasPrevious = swipeTabIndex > 0,
-                                    hasNext = swipeTabIndex in 0 until phoneTabs.lastIndex,
+                                    hasNext = swipeTabIndex in 0 until navigationTabs.lastIndex,
                                     onTurn = { dir ->
-                                        phoneTabs.getOrNull(swipeTabIndex + dir)?.let { nav.navigateTab(it.route) }
+                                        navigationTabs.getOrNull(swipeTabIndex + dir)?.let { nav.navigateTab(it.route) }
                                     },
                                 ),
                         )
@@ -1040,12 +1074,12 @@ private fun MiruroRoot(
                 // that one with a drawn books-on-a-shelf vector, which was the right picture for a
                 // destination called "Library" and the wrong one for a list: a shelf says "things
                 // you own", and a bookmark says "things you marked", which is what the page is.
-                val navItems = remember(menuLanguage) {
-                    phoneTabs.map { tab ->
+                val navItems = remember(menuLanguage, cinema) {
+                    navigationTabs.map { tab ->
                         FloatingNavItem(
                             route = tab.route,
-                            label = tab.label(menuLanguage),
-                            icon = tab.icon,
+                            label = tab.navigationLabel(menuLanguage, cinema),
+                            icon = tab.navigationIcon(cinema),
                         )
                     }
                 }
@@ -1315,13 +1349,7 @@ private fun AppTvTopNavigation(
             modifier = Modifier.fillMaxSize(),
             brand = {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    // The wordmark is a mark, not a destination: it should read as roughly the same
-                    // weight as the labels beside it rather than overhanging them. The image is
-                    // full-bleed type with no internal padding, so 30.dp put its cap height half
-                    // again above a 14.sp label and made the bar look like a logo with a menu
-                    // tucked under one corner. 22.dp is the height the phone header uses against
-                    // the same label size.
-                    AnililiWordmark(modifier = Modifier.height(22.dp))
+                    AnililiWordmark(modifier = Modifier.height(34.dp))
                     tvBrandSuffixFor(BuildConfig.FLAVOR)?.let { suffix ->
                         Text(
                             text = suffix,
@@ -1646,14 +1674,21 @@ private fun NotificationPermissionEffect() {
 private fun AppNavigationRail(
     currentRoute: String?,
     menuLanguage: MenuLanguage,
+    tabs: List<Tab>,
+    cinema: Boolean,
     onNavigate: (String) -> Unit,
     searchRailFocusRequester: FocusRequester,
     searchFieldFocusTarget: TvFocusTarget,
     modifier: Modifier = Modifier,
 ) {
     val device = LocalAppDeviceProfile.current
-    val focusRequesters = remember(searchRailFocusRequester) {
-        Tab.entries.associateWith { tab ->
+    var expanded by remember { mutableStateOf(false) }
+    val railWidth by animateDpAsState(
+        targetValue = if (device.isTv && cinema && expanded) 208.dp else 80.dp,
+        label = "cinemaRailWidth",
+    )
+    val focusRequesters = remember(searchRailFocusRequester, tabs) {
+        tabs.associateWith { tab ->
             if (tab == Tab.SEARCH) searchRailFocusRequester else FocusRequester()
         }
     }
@@ -1663,7 +1698,7 @@ private fun AppNavigationRail(
     // nothing focused at all, which on a D-pad means the user cannot move.
     LaunchedEffect(currentRoute, device.isTv) {
         if (!device.isTv) return@LaunchedEffect
-        val tab = Tab.entries.firstOrNull { it.route == currentRoute } ?: return@LaunchedEffect
+        val tab = tabs.firstOrNull { it.route == currentRoute } ?: return@LaunchedEffect
         val requester = focusRequesters.getValue(tab)
         repeat(TV_FOCUS_ATTEMPTS) { attempt ->
             if (runCatching { requester.requestFocus() }.isSuccess) return@LaunchedEffect
@@ -1674,19 +1709,25 @@ private fun AppNavigationRail(
         }
     }
     NavigationRail(
-        modifier = modifier,
+        modifier = modifier
+            .then(if (device.isTv && cinema) Modifier.width(railWidth) else Modifier)
+            .onFocusChanged { expanded = it.hasFocus },
         containerColor = MaterialTheme.colorScheme.surface,
         header = {
-            Text(
-                stringResource(R.string.app_name),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(vertical = 20.dp),
-            )
+            if (!device.isTv || !cinema || expanded) {
+                Text(
+                    stringResource(R.string.app_name),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(vertical = 20.dp),
+                )
+            } else {
+                Spacer(Modifier.height(20.dp))
+            }
         },
     ) {
-        Tab.entries.forEach { tab ->
-            val label = tab.label(menuLanguage)
+        tabs.forEach { tab ->
+            val label = tab.navigationLabel(menuLanguage, cinema)
             val railFocus = rememberFocusFill()
             NavigationRailItem(
                 colors = if (railFocus.focused) NavigationRailItemDefaults.colors(
@@ -1698,9 +1739,9 @@ private fun AppNavigationRail(
                 ) else NavigationRailItemDefaults.colors(),
                 selected = currentRoute == tab.route,
                 onClick = { onNavigate(tab.route) },
-                icon = { Icon(tab.icon, contentDescription = label) },
+                icon = { Icon(tab.navigationIcon(cinema), contentDescription = label) },
                 label = { Text(label) },
-                alwaysShowLabel = device.isTv,
+                alwaysShowLabel = device.isTv && (!cinema || expanded),
                 modifier = Modifier
                     .focusRequester(focusRequesters.getValue(tab))
                     // Spatial focus search prefers the Movies chip because it is horizontally

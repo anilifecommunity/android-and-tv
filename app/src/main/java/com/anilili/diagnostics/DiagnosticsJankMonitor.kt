@@ -7,6 +7,7 @@ import android.view.Choreographer
 import android.view.WindowManager
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import com.anilili.playback.PlaybackStatus
 import java.util.WeakHashMap
 
 /** API-22-compatible, bounded frame sample that does not keep waking the UI thread indefinitely. */
@@ -41,6 +42,7 @@ object DiagnosticsJankMonitor {
         private var frameCount = 0L
         private var jankFrameCount = 0L
         private var maximumFrameNanos = 0L
+        private var playbackObserved = false
         private var running = false
         private var resumed = false
 
@@ -63,12 +65,14 @@ object DiagnosticsJankMonitor {
             frameCount = 0
             jankFrameCount = 0
             maximumFrameNanos = 0
+            playbackObserved = false
             Choreographer.getInstance().postFrameCallback(this)
             handler.postDelayed(finishSample, SAMPLE_DURATION_MS)
         }
 
         override fun doFrame(frameTimeNanos: Long) {
             if (!running) return
+            playbackObserved = playbackObserved || PlaybackStatus.isPlaying.value
             val previous = lastFrameNanos
             lastFrameNanos = frameTimeNanos
             if (previous > 0) {
@@ -97,6 +101,8 @@ object DiagnosticsJankMonitor {
                     "jankFrames" to jankFrameCount,
                     "maxFrameMs" to (maximumFrameNanos / 1_000_000f),
                     "refreshRate" to refreshRate,
+                    // Video cadence can throttle callbacks below display refresh and is not UI jank.
+                    "playbackActive" to playbackObserved,
                 ),
             )
             lastFrameNanos = 0
