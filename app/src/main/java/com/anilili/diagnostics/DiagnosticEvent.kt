@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-internal const val DIAGNOSTIC_SCHEMA_VERSION = 1
+internal const val DIAGNOSTIC_SCHEMA_VERSION = 2
 
 @Serializable
 internal data class DiagnosticEvent(
@@ -24,6 +24,11 @@ internal data class DiagnosticEvent(
     val level: String,
     val category: String,
     val name: String,
+    val captureMode: String = "standard",
+    val outcome: String? = null,
+    val operationId: String? = null,
+    val traceId: String? = null,
+    val spanId: String? = null,
     val message: String? = null,
     val attributes: Map<String, String> = emptyMap(),
     val exception: DiagnosticException? = null,
@@ -45,6 +50,7 @@ internal data class DiagnosticManifest(
     val buildType: String,
     val buildSha: String,
     val packageName: String,
+    val captureMode: String = "standard",
     val device: Map<String, String>,
     val diagnostics: Map<String, String>,
 )

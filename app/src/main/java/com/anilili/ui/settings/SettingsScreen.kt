@@ -126,6 +126,7 @@ import com.anilili.data.settings.AppLayoutMode
 import com.anilili.data.settings.DiscordStatus
 import com.anilili.data.settings.DEFAULT_PLAYBACK_SPEED
 import com.anilili.data.settings.DefaultQuality
+import com.anilili.data.settings.DiagnosticDetail
 import com.anilili.data.settings.DownloadDestination
 import com.anilili.data.settings.DownloadQuality
 import com.anilili.data.settings.FormFactorPreference
@@ -301,6 +302,7 @@ private enum class SettingsPicker {
     THEME_BACKDROP_IMAGE_TV,
     THEME_BACKDROP_DIM,
     APP_LAYOUT,
+    DIAGNOSTIC_DETAIL,
     FORM_FACTOR,
     POSTER_ELEMENTS,
     HOME_LAYOUT,
@@ -404,6 +406,7 @@ fun SettingsScreen(
     val releaseNotifications by SettingsStore.releaseNotifications.collectAsState()
     val announcements by SettingsStore.announcements.collectAsState()
     val automaticDiagnostics by DiagnosticsUploadManager.automatic.collectAsState()
+    val diagnosticDetail by SettingsStore.diagnosticDetail.collectAsState()
     val diagnosticsUploadStatus by DiagnosticsUploadManager.status.collectAsState()
     val hideAdultContent by SettingsStore.hideAdultContent.collectAsState()
     val hideAiringTomorrowFromContinue by SettingsStore.hideAiringTomorrowFromContinue.collectAsState()
@@ -1971,6 +1974,20 @@ fun SettingsScreen(
             dismissOnSelect = false,
         )
 
+        SettingsPicker.DIAGNOSTIC_DETAIL -> MidnightChoicePicker(
+            kicker = "App",
+            title = "Diagnostic detail",
+            explanation = "Standard keeps essential failures and compact performance evidence. " +
+                "Enhanced keeps more allowlisted operation detail until you switch back. " +
+                "This does not enable uploads.",
+            options = DiagnosticDetail.entries,
+            selected = diagnosticDetail,
+            label = { it.label },
+            onSelect = SettingsStore::setDiagnosticDetail,
+            onDismiss = closePicker,
+            dismissOnSelect = false,
+        )
+
         null -> Unit
     }
     }
@@ -3209,6 +3226,14 @@ fun SettingsScreen(
                         description = "Off by default · daily redacted reports after opt-in · private 30-day retention",
                         checked = automaticDiagnostics,
                         onCheckedChange = { DiagnosticsUploadManager.setAutomatic(context, it) },
+                    )
+                }
+                item(key = "Diagnostic detail") {
+                    MidnightSettingRow(
+                        title = "Diagnostic detail",
+                        description = "Local collection level · independent from uploads",
+                        value = diagnosticDetail.label,
+                        onClick = { openPicker = SettingsPicker.DIAGNOSTIC_DETAIL },
                     )
                 }
                 item(key = "Upload diagnostics now") {

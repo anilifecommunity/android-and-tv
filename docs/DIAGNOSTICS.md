@@ -4,6 +4,18 @@ Diagnostic collection is local by default. A report leaves the device only when 
 or uploads one manually, approves the crash-report prompt, or explicitly enables the separate
 **Automatically upload diagnostics** setting. That setting is off by default.
 
+**Diagnostic detail** is independent from upload consent and persists until changed:
+
+- **Standard** is the default. It keeps failures and high-value operation summaries while sampling
+  repetitive successful lifecycle, HTTP and player-size events (the first and every twentieth).
+- **Enhanced** keeps every allowlisted event for reproducing an intermittent problem. Switching
+  back to Standard takes effect immediately and does not delete existing local events.
+
+Each version 2 event records its capture mode and can include a bounded outcome plus short-lived
+operation, trace and span correlation. Reports include persisted, sampled and queue-drop counters
+so missing detail is explicit rather than silently presented as a complete trace. Version 1 event
+lines remain readable with Standard defaults.
+
 Enabling automatic upload starts a new consent window: events recorded before consent are excluded.
 The app schedules at most one daily report, retains a staged report unchanged across safe retries,
 and accepts success only when the service returns the same report ID. Turning the setting off
@@ -24,9 +36,11 @@ exit traces when the OS exposes them.
 Before a report is created, the app centrally redacts the written description plus passwords,
 cookies, authorization headers,
 access and refresh tokens, JWTs, email addresses, signed URL paths/query parameters, anime titles,
-slugs and other sensitive content identifiers. Screenshots can contain whatever is visible in the
-selected image, so the UI warns users to attach only content they intend to send. Raw IP addresses
-are not stored.
+slugs and other sensitive content identifiers. Structured attribute names are allowlisted, each
+event is capped at 48 attributes, values are capped at 512 characters, and correlation identifiers
+accept only short non-personal tokens. Screenshots can contain whatever is visible in the selected
+image, so the UI warns users to attach only content they intend to send. Raw IP addresses are not
+stored.
 
 Generated share-sheet ZIPs remain in Android's disposable app cache for up to 24 hours so the
 selected target can read them. Android may clear them sooner under storage pressure, and the app

@@ -30,6 +30,15 @@ Reports can include app and device configuration, Android version, performance s
 
 Anilife redacts passwords, cookies, authorisation headers, account tokens, email addresses, signed media URLs, anime titles, slugs, and other sensitive content identifiers before creating the ZIP. A screenshot can still contain anything visible in the image, so attach only one you intend to send.
 
+## Choose the local detail level
+
+Open **Settings → App → Diagnostic detail**:
+
+- **Standard** is the default. It keeps failures and compact operation summaries while sampling repetitive successful events.
+- **Enhanced** keeps more allowlisted event detail until you switch back to Standard. Use it only while reproducing a difficult problem.
+
+Changing detail does not enable uploads. Reports identify the active detail mode and include sampled or dropped-event counters so maintainers can tell when a trace is incomplete.
+
 ## Optional uploads
 
 - **Upload diagnostics now** sends one redacted report to the private Anilife diagnostics service.

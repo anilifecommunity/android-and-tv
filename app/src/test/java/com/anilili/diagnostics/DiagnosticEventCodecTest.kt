@@ -21,6 +21,11 @@ class DiagnosticEventCodecTest {
             level = "INFO",
             category = "playback",
             name = "session.summary",
+            captureMode = "enhanced",
+            outcome = "success",
+            operationId = "playback-abcd1234",
+            traceId = "trace-1",
+            spanId = "span-1",
             attributes = mapOf("rebufferCount" to "2"),
         )
 
@@ -29,7 +34,24 @@ class DiagnosticEventCodecTest {
         assertEquals(DIAGNOSTIC_SCHEMA_VERSION, decoded.schemaVersion)
         assertEquals("session", decoded.sessionId)
         assertEquals(7, decoded.sequence)
+        assertEquals("enhanced", decoded.captureMode)
+        assertEquals("success", decoded.outcome)
+        assertEquals("playback-abcd1234", decoded.operationId)
+        assertEquals("trace-1", decoded.traceId)
+        assertEquals("span-1", decoded.spanId)
         assertEquals("2", decoded.attributes["rebufferCount"])
+    }
+
+    @Test
+    fun `version one events decode with safe version two defaults`() {
+        val decoded = DiagnosticEventCodec.decode(
+            """{"schemaVersion":1,"timestampUtc":"2026-07-29T12:00:00.000Z","elapsedRealtimeMs":2,"processUptimeMs":1,"sessionId":"old","sequence":1,"process":"main","pid":1,"thread":"main","threadId":1,"level":"INFO","category":"app","name":"process.start"}""",
+        )
+
+        assertEquals(1, decoded.schemaVersion)
+        assertEquals("standard", decoded.captureMode)
+        assertEquals(null, decoded.outcome)
+        assertEquals(null, decoded.operationId)
     }
 
     @Test

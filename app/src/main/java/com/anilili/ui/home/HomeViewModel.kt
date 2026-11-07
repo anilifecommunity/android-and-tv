@@ -294,7 +294,14 @@ class HomeViewModel : ViewModel() {
         val generation = ++loadGeneration
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            DiagnosticsLog.event("Home load start force=$force")
+            val operationId = DiagnosticsLog.newOperationId("home")
+            DiagnosticsLog.event(
+                "home",
+                "load.started",
+                mapOf("forced" to force),
+                outcome = "started",
+                operationId = operationId,
+            )
             val startedAtMs = SystemClock.elapsedRealtime()
             if (force && _state.value is UiState.Success) _isRefreshing.value = true else _state.value = UiState.Loading
             try {
@@ -320,9 +327,19 @@ class HomeViewModel : ViewModel() {
                 _exhausted.value = emptySet()
                 _loadingMore.value = emptySet()
                 DiagnosticsLog.event(
-                    "Home load success spotlight=${data.spotlight.size} newest=${data.newest.size} " +
-                        "popular=${data.popular.size} movies=${data.movies.size} topRated=${data.topRated.size} " +
-                        "upcoming=${data.upcoming.size}",
+                    "home",
+                    "load.completed",
+                    mapOf(
+                        "spotlightCount" to data.spotlight.size,
+                        "newestCount" to data.newest.size,
+                        "popularCount" to data.popular.size,
+                        "movieCount" to data.movies.size,
+                        "topRatedCount" to data.topRated.size,
+                        "upcomingCount" to data.upcoming.size,
+                        "elapsedMs" to (SystemClock.elapsedRealtime() - startedAtMs),
+                    ),
+                    outcome = "success",
+                    operationId = operationId,
                 )
                 _state.value = UiState.Success(data)
                 // What was just drawn is usually the cached copy — up to a week old, since stale
@@ -336,7 +353,11 @@ class HomeViewModel : ViewModel() {
                 // No separate DiagnosticsLog call: the report is written by toFailure, under the
                 // code the viewer is looking at, which is the only way the two cannot disagree.
                 _state.value = UiState.Error(
-                    e.toFailure(AnililiError.HOME_LOAD_FAILED, attributes = mapOf("forced" to force)),
+                    e.toFailure(
+                        AnililiError.HOME_LOAD_FAILED,
+                        attributes = mapOf("forced" to force),
+                        operationId = operationId,
+                    ),
                 )
             } finally {
                 if (generation == loadGeneration) {

@@ -38,6 +38,7 @@ import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.function.Consumer
@@ -64,10 +65,21 @@ object DiagnosticsLog {
     @Volatile private var watchdogStarted = false
     @Volatile private var lastMainBlockLogAt = 0L
     @Volatile private var lastProcessStateAt = 0L
+    @Volatile private var captureMode = "standard"
 
     private val sessionId = UUID.randomUUID().toString()
     private val processStartedElapsedMs = SystemClock.elapsedRealtime()
     private val sequence = AtomicLong(0)
+    private val sampledEvents = AtomicLong(0)
+    private val eventOccurrences = ConcurrentHashMap<String, AtomicLong>()
+
+    fun setCaptureMode(value: String) {
+        captureMode = if (value == "enhanced") "enhanced" else "standard"
+    }
+
+    /** Privacy-safe correlation for one bounded operation, never an installation identity. */
+    fun newOperationId(prefix: String): String =
+        "${prefix.lowercase(Locale.US).replace(Regex("[^a-z0-9_-]"), "_").take(20)}-${UUID.randomUUID().toString().take(8)}"
 
     fun init(context: Context) {
         val app = context.applicationContext
@@ -115,6 +127,10 @@ object DiagnosticsLog {
         name: String,
         attributes: Map<String, Any?> = emptyMap(),
         message: String? = null,
+        outcome: String? = null,
+        operationId: String? = null,
+        traceId: String? = null,
+        spanId: String? = null,
     ) {
         record(
             level = "INFO",
@@ -122,6 +138,10 @@ object DiagnosticsLog {
             name = name,
             message = message,
             attributes = attributes.mapValues { (_, value) -> value?.toString() ?: "null" },
+            outcome = outcome,
+            operationId = operationId,
+            traceId = traceId,
+            spanId = spanId,
         )
     }
 
@@ -146,6 +166,9 @@ object DiagnosticsLog {
         message: String? = null,
         attributes: Map<String, Any?> = emptyMap(),
         throwable: Throwable? = null,
+        operationId: String? = null,
+        traceId: String? = null,
+        spanId: String? = null,
     ) {
         val exception = throwable?.let {
             DiagnosticException(
@@ -162,6 +185,10 @@ object DiagnosticsLog {
                 message = message,
                 attributes = attributes.mapValues { (_, value) -> value?.toString() ?: "null" },
                 exception = exception,
+                outcome = "failure",
+                operationId = operationId,
+                traceId = traceId,
+                spanId = spanId,
             ),
         )
     }
@@ -455,10 +482,12 @@ object DiagnosticsLog {
                 buildType = BuildConfig.BUILD_TYPE,
                 buildSha = BuildConfig.GIT_SHA,
                 packageName = context.packageName,
+                captureMode = captureMode,
                 device = system,
                 diagnostics = mapOf(
                     "eventCount" to eventCount.toString(),
                     "droppedEventsThisProcess" to (store?.droppedCount() ?: 0L).toString(),
+                    "sampledEventsThisProcess" to sampledEvents.get().toString(),
                     "sessionId" to sessionId,
                     "process" to processName,
                     "format" to "zip/jsonl",
@@ -517,8 +546,31 @@ object DiagnosticsLog {
         name: String,
         message: String? = null,
         attributes: Map<String, String> = emptyMap(),
+        outcome: String? = null,
+        operationId: String? = null,
+        traceId: String? = null,
+        spanId: String? = null,
     ) {
-        store?.append(newEvent(level, category, name, message, attributes))
+        val occurrence = eventOccurrences
+            .computeIfAbsent("$category:$name") { AtomicLong(0) }
+            .incrementAndGet()
+        if (!diagnosticEventShouldPersist(captureMode, level, category, name, outcome, occurrence)) {
+            sampledEvents.incrementAndGet()
+            return
+        }
+        store?.append(
+            newEvent(
+                level,
+                category,
+                name,
+                message,
+                attributes,
+                outcome = outcome,
+                operationId = operationId,
+                traceId = traceId,
+                spanId = spanId,
+            ),
+        )
     }
 
     @Suppress("DEPRECATION") // Thread.threadId() is not available to the Java 17 build.
@@ -529,6 +581,10 @@ object DiagnosticsLog {
         message: String? = null,
         attributes: Map<String, String> = emptyMap(),
         exception: DiagnosticException? = null,
+        outcome: String? = null,
+        operationId: String? = null,
+        traceId: String? = null,
+        spanId: String? = null,
     ): DiagnosticEvent {
         val thread = Thread.currentThread()
         val nowElapsed = SystemClock.elapsedRealtime()
@@ -545,6 +601,11 @@ object DiagnosticsLog {
             level = level,
             category = category.lowercase(Locale.US).take(40),
             name = name.lowercase(Locale.US).replace(' ', '_').take(80),
+            captureMode = captureMode,
+            outcome = outcome,
+            operationId = operationId,
+            traceId = traceId,
+            spanId = spanId,
             message = message,
             attributes = attributes,
             exception = exception,
@@ -746,6 +807,10 @@ object DiagnosticsLog {
         appendLine("Device: ${manifest.device["manufacturer"]} ${manifest.device["model"]}")
         appendLine("Android: ${manifest.device["android"]} (SDK ${manifest.device["sdk"]})")
         appendLine("Events: $eventCount")
+        appendLine(
+            "Detail: ${manifest.captureMode}; sampled=${manifest.diagnostics["sampledEventsThisProcess"] ?: "0"}; " +
+                "queue-dropped=${manifest.diagnostics["droppedEventsThisProcess"] ?: "0"}",
+        )
         appendLine("Privacy: URL paths/query strings, credentials, tokens, cookies, search terms, titles, and slugs are redacted.")
         appendLine("Native traces: raw Android native-crash traces can contain low-level device or process details.")
         appendLine()
@@ -991,3 +1056,24 @@ object DiagnosticsLog {
         closeEntry()
     }
 }
+
+internal fun diagnosticEventShouldPersist(
+    captureMode: String,
+    level: String,
+    category: String,
+    name: String,
+    outcome: String?,
+    occurrence: Long,
+): Boolean = captureMode == "enhanced" ||
+    level != "INFO" ||
+    outcome == "failure" ||
+    (category != "lifecycle" && "$category:$name" !in STANDARD_SAMPLED_EVENTS) ||
+    occurrence == 1L ||
+    occurrence % 20L == 0L
+
+private val STANDARD_SAMPLED_EVENTS = setOf(
+    "network:http.call.started",
+    "network:http.call.complete",
+    "network:http.call.canceled",
+    "playback:video.size_changed",
+)

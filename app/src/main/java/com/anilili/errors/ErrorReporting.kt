@@ -27,12 +27,13 @@ fun AnililiError.report(
     detail: String? = null,
     cause: Throwable? = null,
     attributes: Map<String, Any?> = emptyMap(),
+    operationId: String? = null,
 ): AnililiFailure = AnililiFailure(
     error = this,
     message = message(*args),
     detail = detail ?: cause?.technicalDetail(),
     platformCode = cause?.platformErrorCode(),
-).report(cause = cause, attributes = attributes)
+).report(cause = cause, attributes = attributes, operationId = operationId)
 
 /**
  * Records a failure that was built earlier.
@@ -45,6 +46,7 @@ fun AnililiError.report(
 fun AnililiFailure.report(
     cause: Throwable? = null,
     attributes: Map<String, Any?> = emptyMap(),
+    operationId: String? = null,
 ): AnililiFailure {
     // A cancelled coroutine is not a failure — it is the caller changing its mind, and logging it
     // as an error buries the real ones. The failure is still returned so a caller that genuinely
@@ -63,6 +65,7 @@ fun AnililiFailure.report(
                 putAll(attributes)
             },
             throwable = cause,
+            operationId = operationId,
         )
     }
     return this
@@ -95,11 +98,12 @@ fun Throwable.toFailure(
     fallback: AnililiError = AnililiError.UNEXPECTED,
     vararg args: Any?,
     attributes: Map<String, Any?> = emptyMap(),
+    operationId: String? = null,
 ): AnililiFailure {
     anililiFailure()?.let { return it }
     val mapped = (if (isTlsIntercepted()) AnililiError.NETWORK_INTERCEPTED else classifyTransport()) ?: fallback
     val mappedArgs = if (mapped === fallback) args else emptyArray()
-    return mapped.report(*mappedArgs, cause = this, attributes = attributes)
+    return mapped.report(*mappedArgs, cause = this, attributes = attributes, operationId = operationId)
 }
 
 /**

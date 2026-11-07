@@ -240,7 +240,15 @@ class DetailViewModel : ViewModel() {
         if (!force && loadedId == id && _state.value is UiState.Success) return
         loadedId = id
         viewModelScope.launch {
+            val operationId = DiagnosticsLog.newOperationId("detail")
             val startedAtMs = SystemClock.elapsedRealtime()
+            DiagnosticsLog.event(
+                "detail",
+                "load.started",
+                mapOf("forced" to force),
+                outcome = "started",
+                operationId = operationId,
+            )
             if (force && _state.value is UiState.Success) {
                 _isRefreshing.value = true
             } else {
@@ -285,10 +293,20 @@ class DetailViewModel : ViewModel() {
                     // And the page's own, if a chip had moved the selection off it by then.
                     if (current.pageLogo == null && current.selectedSeasonId != info.id) launchLogo(info.id)
                 }
+                DiagnosticsLog.event(
+                    "detail",
+                    "load.completed",
+                    mapOf("elapsedMs" to (SystemClock.elapsedRealtime() - startedAtMs)),
+                    outcome = "success",
+                    operationId = operationId,
+                )
             } catch (e: Exception) {
                 e.rethrowIfCancellation()
                 _state.value = UiState.Error(
-                    e.toFailure(AnililiError.TITLE_LOAD_FAILED, attributes = mapOf("anilistId" to id)),
+                    e.toFailure(
+                        AnililiError.TITLE_LOAD_FAILED,
+                        operationId = operationId,
+                    ),
                 )
             } finally {
                 // A page whose info is already cached comes back in a couple of hundred

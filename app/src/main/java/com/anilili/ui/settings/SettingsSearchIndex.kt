@@ -252,6 +252,8 @@ internal fun settingsSearchEntries(isTv: Boolean): List<SettingsSearchEntry> = b
         listOf(
             "Check for updates on launch" to listOf("update", "version", "upgrade"),
             "Receive beta updates" to listOf("update", "beta", "preview", "tester"),
+            "Diagnostic detail" to
+                listOf("diagnostics", "logs", "standard", "enhanced", "detail", "local"),
             "Automatically upload diagnostics" to
                 listOf("diagnostics", "logs", "report", "daily", "automatic", "consent"),
             "Upload diagnostics now" to listOf("diagnostics", "logs", "report", "bug", "send"),
