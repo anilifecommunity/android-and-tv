@@ -27,6 +27,7 @@
     "aws4fetch": "^1.0.20",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.7.3",
     "helmet": "^8.1.0",
     "multer": "^2.0.2",
     "react": "^19.1.1",

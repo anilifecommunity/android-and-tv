@@ -113,7 +113,6 @@ describe("diagnostic gateway", () => {
       store,
       config: {
         adminAccessKey: "admin-access-key-with-more-than-24-characters",
-        rateLimitSecret: "rate-limit-secret-with-more-than-24-characters",
         turnstileSecret: "turnstile-secret-for-tests",
         turnstileSiteKey: "1x00000000000000000000AA",
         turnstileHostname: "diagnostics.example",

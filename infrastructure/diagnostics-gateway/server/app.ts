@@ -5,6 +5,7 @@ import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import cookieParser from "cookie-parser";
 import express, { type NextFunction, type Request, type Response } from "express";
+import { rateLimit } from "express-rate-limit";
 import helmet from "helmet";
 import multer from "multer";
 import {
@@ -19,13 +20,13 @@ import {
   MAX_BYTES_PER_DAY,
   MAX_COMPRESSED_BYTES,
   MAX_DESCRIPTION_CHARS,
+  MAX_REPORTS_PER_IP_HOUR,
   MAX_REPORTS_PER_DAY,
   MAX_SCREENSHOT_BYTES,
   MAX_STORED_BYTES,
   RETENTION_DAYS,
   type RuntimeConfig,
 } from "./config.js";
-import { AdminLoginLimiter, UploadRateLimiter, UploadRateLimitError } from "./rate-limit.js";
 import type { DiagnosticTrigger, ReportMetadata, ReportStore, ScreenshotUpload } from "./types.js";
 
 const STARTED_AT = Date.now();
@@ -150,29 +151,22 @@ function logEvent(name: string, attributes: Record<string, unknown> = {}): void 
   console.log(JSON.stringify({ timestamp: new Date().toISOString(), name, ...attributes }));
 }
 
-function clientAddress(request: Request): string {
-  return request.ip ?? request.socket.remoteAddress ?? "unknown";
-}
-
 export function createApp({ store, config }: AppDependencies) {
   const app = express();
-  const uploadRateLimiter = new UploadRateLimiter(config.rateLimitSecret);
-  const loginLimiter = new AdminLoginLimiter();
-  const limitUploads = (request: Request, _response: Response, next: NextFunction): void => {
-    try {
-      uploadRateLimiter.reserve(clientAddress(request));
-      next();
-    } catch (error) {
-      next(error);
-    }
-  };
-  const limitAdminLogin = (request: Request, response: Response, next: NextFunction): void => {
-    if (!loginLimiter.allow(clientAddress(request))) {
-      response.status(429).json({ error: "Too many sign-in attempts; try again later" });
-      return;
-    }
-    next();
-  };
+  const limitUploads = rateLimit({
+    windowMs: 60 * 60 * 1_000,
+    limit: MAX_REPORTS_PER_IP_HOUR,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Too many reports from this device; try again later" },
+  });
+  const limitAdminLogin = rateLimit({
+    windowMs: 15 * 60 * 1_000,
+    limit: 10,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Too many sign-in attempts; try again later" },
+  });
   const upload = multer({
     dest: config.tempDirectory,
     limits: {
@@ -428,7 +422,7 @@ export function createApp({ store, config }: AppDependencies) {
       response.status(409).json({ error: error.message });
       return;
     }
-    if (error instanceof UploadRateLimitError || error instanceof DailyCapacityError) {
+    if (error instanceof DailyCapacityError) {
       response.status(429).json({ error: error.message });
       return;
     }
