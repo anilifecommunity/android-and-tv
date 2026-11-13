@@ -62,4 +62,12 @@ class DisabledProviderTest {
         assertTrue(selectable.isNotEmpty())
         assertEquals(emptyList<String>(), ProviderCatalog.enabledProviders(selectable, selectable.toSet()))
     }
+
+    @Test
+    fun `adult servers are all available only after opt in`() {
+        assertTrue(ProviderCatalog.adultProviders.all { it in ProviderCatalog.anivexaProvidersFor(false) })
+        assertTrue(ProviderCatalog.adultProviders.all { it in ProviderCatalog.selectableProviders(false) })
+        assertTrue(ProviderCatalog.adultProviders.none { it in ProviderCatalog.anivexaProvidersFor(true) })
+        assertTrue(ProviderCatalog.adultProviders.none { it in ProviderCatalog.selectableProviders(true) })
+    }
 }

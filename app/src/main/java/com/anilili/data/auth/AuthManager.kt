@@ -17,18 +17,17 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.intOrNull
 
 /**
- * AniList OAuth (Implicit Grant). AniList redirects to `http://localhost/#access_token=…`; the
- * login WebView intercepts that URL before Android networking tries to open localhost. No client
- * secret is stored in the app. Tokens are long-lived (~1 year; AniList has no refresh).
+ * AniList OAuth (Implicit Grant). The login WebView intercepts the registered callback before its
+ * page loads. No client secret is stored in the app. Tokens are long-lived (~1 year; AniList has
+ * no refresh).
  */
 object AuthManager {
     val CLIENT_ID: String get() = BuildConfig.ANILIST_CLIENT_ID
-    const val REDIRECT = "http://localhost"
     private const val AUTHORIZE_ENDPOINT = "https://anilist.co/api/v2/oauth/authorize"
 
     private lateinit var tokenStore: SecureTokenStore
+    private lateinit var pendingStore: SecureTokenStore
     private lateinit var appContext: Context
-    private var pendingOAuthState: String? = null
 
     private val _token = MutableStateFlow<String?>(null)
     val token = _token.asStateFlow()
@@ -36,6 +35,7 @@ object AuthManager {
     fun init(context: Context) {
         appContext = context.applicationContext
         tokenStore = SecureTokenStore(appContext)
+        pendingStore = SecureTokenStore(appContext, SecureTokenStore.KEY_ANILIST_PENDING_AUTH)
         _token.value = tokenStore.load()?.takeUnless(::isJwtExpired)
         if (_token.value == null) tokenStore.clear()
     }
@@ -55,7 +55,7 @@ object AuthManager {
         check(isConfigured) { "AniList is not configured for this Anilife build." }
         val state = ByteArray(24).also(SecureRandom()::nextBytes)
             .let { Base64.encodeToString(it, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING) }
-        pendingOAuthState = state
+        pendingStore.save(state)
         // AniList's implicit flow uses the redirect registered for the client. Supplying the same
         // redirect explicitly currently makes its post-login grant step fail with unsupported_grant_type.
         return Uri.parse(AUTHORIZE_ENDPOINT).buildUpon()
@@ -71,7 +71,7 @@ object AuthManager {
         require(normalized.isNotEmpty()) { "AniList returned an empty token" }
         tokenStore.save(normalized)
         _token.value = normalized
-        pendingOAuthState = null
+        pendingStore.clear()
         AniListNotificationPushManager.clearDelivered(appContext)
         ReleaseSyncScheduler.runNow(appContext)
         AiringPollScheduler.runNow(appContext)
@@ -84,20 +84,15 @@ object AuthManager {
     /**
      * True once a redirect URL carries the token; extract it with [extractToken].
      *
-     * Either scheme on localhost counts. AniList sends whatever the client is registered with, and
-     * a client registered `https://localhost` used to fall straight through this check — the
-     * WebView then tried to really open localhost and the token was lost, with nothing to show for
-     * it but a login screen that closed itself. Nothing leaves the device either way: the token
-     * arrives in the URL fragment and is read here before any request is made.
+     * The production web callback is accepted as well as the historical loopback and native
+     * callback. State is still mandatory, so a lookalike page cannot inject a token.
      */
     fun isRedirect(url: String): Boolean {
-        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
-        val localhostRedirect = (uri.scheme == "http" || uri.scheme == "https") && uri.host == "localhost"
-        return localhostRedirect && uri.fragment?.contains("access_token=") == true
+        return oauthCallbackParameters(url, OAuthService.ANILIST) != null
     }
 
     fun extractToken(url: String): String? {
-        val expectedState = pendingOAuthState ?: return null
+        val expectedState = pendingStore.load() ?: return null
         return tokenFrom(url, expectedState)
     }
 
@@ -106,7 +101,7 @@ object AuthManager {
      * than a copy of this device's: AniList issues a fresh one per authorization, so each device
      * can be signed out without disturbing the other.
      *
-     * The caller owns [state]. The local login keeps its own in `pendingOAuthState`, and a pairing
+     * The caller owns [state]. The local login keeps its own encrypted pending state, and a pairing
      * must not overwrite it — cancelling one would otherwise invalidate the other.
      */
     fun pairingAuthorizeUrl(state: String): String {
@@ -125,18 +120,16 @@ object AuthManager {
     fun newOAuthState(): String = ByteArray(24).also(SecureRandom()::nextBytes)
         .let { Base64.encodeToString(it, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING) }
 
+    fun cancelPendingAuthorization() = pendingStore.clear()
+
     private fun tokenFrom(url: String, expectedState: String): String? {
-        if (!isRedirect(url)) return null
-        val uri = Uri.parse(url)
-        val fragment = Uri.parse("$REDIRECT/?${uri.fragment.orEmpty()}")
-        if (fragment.getQueryParameter("state") != expectedState) return null
-        return fragment.getQueryParameter("access_token")?.takeIf { it.isNotBlank() }
+        return validatedOAuthResult(url, OAuthService.ANILIST, expectedState, "access_token")
     }
 
     private fun clearToken(scheduleSync: Boolean) {
         tokenStore.clear()
+        pendingStore.clear()
         _token.value = null
-        pendingOAuthState = null
         AniListNotificationPushManager.clearDelivered(appContext)
         if (scheduleSync) ReleaseSyncScheduler.runNow(appContext)
     }

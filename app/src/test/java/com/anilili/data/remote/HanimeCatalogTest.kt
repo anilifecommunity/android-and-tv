@@ -3,6 +3,7 @@ package com.anilili.data.remote
 import com.anilili.data.model.Media
 import com.anilili.data.model.MediaTitle
 import com.anilili.data.model.StreamItem
+import com.anilili.data.model.DiscoverFilters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -201,6 +202,36 @@ class HanimeCatalogTest {
     }
 
     @Test
+    fun `hentai genre pages the device catalogue and applies known filters`() {
+        val catalogue = listOf(
+            video(1, "First", "first", tags = listOf("elf"), releasedAt = "2024-01-01"),
+            video(2, "Second", "second", tags = listOf("school"), releasedAt = "2025-01-01"),
+            video(3, "Third", "third", tags = listOf("elf"), releasedAt = "2025-01-01"),
+        )
+        val filters = DiscoverFilters(genres = setOf(HANIME_GENRE), tags = setOf("elf"), yearFrom = 2025)
+
+        val result = discoverHanimeCatalogue(filters, catalogue, page = 1, pageSize = 1)
+
+        assertEquals(listOf("Third"), result.items.map { it.title.romaji })
+        assertEquals(1, result.total)
+        assertEquals(false, result.hasNextPage)
+    }
+
+    @Test
+    fun `device adult catalogue never answers a non-hentai or contradictory request`() {
+        val catalogue = listOf(video(1, "First", "first"))
+
+        assertTrue(discoverHanimeCatalogue(DiscoverFilters(), catalogue, page = 1).items.isEmpty())
+        assertTrue(
+            discoverHanimeCatalogue(
+                DiscoverFilters(genres = setOf(HANIME_GENRE), excludedGenres = setOf(HANIME_GENRE)),
+                catalogue,
+                page = 1,
+            ).items.isEmpty(),
+        )
+    }
+
+    @Test
     fun `streams are ordered sharpest first`() {
         val streams = listOf(stream(720), stream(1080), stream(480), stream(null))
 
@@ -216,7 +247,15 @@ class HanimeCatalogTest {
         slug: String,
         searchTitles: String = "",
         tags: List<String> = emptyList(),
-    ) = HanimeVideo(id = id, name = name, slug = slug, searchTitles = searchTitles, tags = tags)
+        releasedAt: String = "",
+    ) = HanimeVideo(
+        id = id,
+        name = name,
+        slug = slug,
+        searchTitles = searchTitles,
+        tags = tags,
+        releasedAt = releasedAt,
+    )
 
     private fun stream(height: Int?) = StreamItem(
         url = "https://example/$height.m3u8",
