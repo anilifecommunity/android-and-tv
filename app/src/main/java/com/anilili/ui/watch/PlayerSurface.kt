@@ -104,6 +104,9 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.DefaultTrackNameProvider
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
 import com.anilili.R
 import com.anilili.data.ProviderCatalog
 import com.anilili.data.library.HistoryEntry
@@ -332,6 +335,7 @@ fun PlayerSurface(
     fillerSkip: PlayerFillerSkip? = null,
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = remember(context) { context.findActivity() as? LifecycleOwner }
     val device = LocalAppDeviceProfile.current
     val scope = rememberCoroutineScope()
     var attachedSubtitles by remember(animeId, episode) {
@@ -1968,7 +1972,10 @@ fun PlayerSurface(
             factory = { ctx ->
                 DiagnosticsLog.event("PlayerSurface AndroidView factory create PlayerView")
                 PlayerView(ctx).apply {
-                    player = playerControls
+                    player = playerControls.takeIf {
+                        !device.isTv || lifecycleOwner?.lifecycle?.currentState
+                            ?.isAtLeast(Lifecycle.State.STARTED) != false
+                    }
                     // Phone and TV both draw their own controls (Compose bar / TvPlayerControls),
                     // so Media3's built-in controller is off everywhere.
                     useController = false
@@ -2009,7 +2016,10 @@ fun PlayerSurface(
                 }
             },
             update = {
-                it.player = playerControls
+                it.player = playerControls.takeIf {
+                    !device.isTv || lifecycleOwner?.lifecycle?.currentState
+                        ?.isAtLeast(Lifecycle.State.STARTED) != false
+                }
                 it.isFocusable = !device.isTv
                 it.isFocusableInTouchMode = !device.isTv
                 it.resizeMode = playerResizeMode(contentScale)
@@ -2030,6 +2040,25 @@ fun PlayerSurface(
             },
             modifier = Modifier.fillMaxSize(),
         )
+
+        // Some TV input compositors keep a stopped app's SurfaceView above HDMI until Home forces
+        // another composition. Detach only the TV surface; the service already pauses playback.
+        DisposableEffect(device.isTv, lifecycleOwner, playerView, playerControls) {
+            val view = playerView
+            if (!device.isTv || lifecycleOwner == null || view == null) {
+                onDispose {}
+            } else {
+                val observer = LifecycleEventObserver { _, event ->
+                    tvPlayerSurfaceAttached(event)?.let { attached ->
+                        view.visibility = if (attached) View.VISIBLE else View.INVISIBLE
+                        view.player = playerControls.takeIf { attached }
+                        DiagnosticsLog.event("PlayerSurface TV surface attached=$attached event=$event")
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+            }
+        }
 
         // The screen stays awake while the viewer means the episode to play, buffering included, so
         // a stall that outlasts the screen timeout does not end on a dark screen. It is released
@@ -3174,6 +3203,12 @@ internal fun playerResizeMode(scale: PlayerContentScale): Int = when (scale) {
 /** PlayerView's own formula, so both agree on what the picture's shape is. */
 internal fun VideoSize.contentAspectRatio(): Float =
     if (width == 0 || height == 0) 0f else width * pixelWidthHeightRatio / height
+
+internal fun tvPlayerSurfaceAttached(event: Lifecycle.Event): Boolean? = when (event) {
+    Lifecycle.Event.ON_START, Lifecycle.Event.ON_RESUME -> true
+    Lifecycle.Event.ON_STOP -> false
+    else -> null
+}
 
 /**
  * Keeps the frame the picture is measured into honest about the video's shape.

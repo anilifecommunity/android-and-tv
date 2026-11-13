@@ -7,7 +7,7 @@ change to the icon is one edit followed by a re-run:
 
     python scripts/generate_icon_variants.py
 
-The canonical transparent mark lives at docs/assets/anilife-logo-transparent.png. The supplied
+The canonical launcher foreground is the supplied transparent boy-and-leaf emblem. The supplied
 green artwork is the default; generated theme variants tint only its green light.
 """
 
@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw, ImageFont
 APP = Path(__file__).resolve().parent.parent / "app" / "src"
 RES = APP / "main" / "res"
 ROOT = APP.parents[1]
-MASTER = ROOT / "docs" / "assets" / "anilife-logo-transparent.png"
+MASTER = RES / "drawable-nodpi" / "anilife_logo_emblem.png"
 # Written into the mobile flavor only: the TV flavor keeps one fixed icon and never ships these.
 OUT = APP / "mobile" / "res"
 # Adaptive-icon foregrounds are 108dp; 432px is that at xxxhdpi, the densest bucket a phone draws.
@@ -52,6 +52,8 @@ ADAPTIVE = """<?xml version="1.0" encoding="utf-8"?>
 
 
 def recolor(image: Image.Image, accent: int) -> Image.Image:
+    if accent == 0xFFFFFF:
+        return image.convert("LA").convert("RGBA")
     rgba = np.asarray(image.convert("RGBA")).astype(np.float32) / 255.0
     rgb, alpha = rgba[..., :3], rgba[..., 3:]
     value = rgb.max(axis=-1, keepdims=True)
@@ -105,11 +107,11 @@ def main() -> None:
     assert visible.any() and ((source[..., 1] - source[..., 0] > 20) & visible).any(), "logo must contain green artwork"
 
     # Android guarantees only the central 66/108dp circle across adaptive-icon masks.
-    foreground = mark(FOREGROUND_PX, 0.62)
+    foreground = mark(FOREGROUND_PX, 0.72)
     foreground.save(RES / "drawable" / "anilili_launcher.png", optimize=True)
-    icon = on_black(mark(1024))
+    icon = on_black(mark(1024, 0.88))
     icon.save(ROOT / "docs" / "assets" / "icon.png", optimize=True)
-    round_on_black(mark(320, 0.72)).save(
+    round_on_black(mark(320, 0.84)).save(
         APP / "tv" / "res" / "drawable-nodpi" / "tv_launcher_icon.png",
         optimize=True,
     )
@@ -119,7 +121,7 @@ def main() -> None:
     banner.save(RES / "drawable-nodpi" / "tv_banner_art.png", optimize=True)
 
     for density, size in DENSITY_SIZES.items():
-        base = round_on_black(mark(size, 0.72))
+        base = round_on_black(mark(size, 0.86))
         base.save(RES / f"mipmap-{density}" / "ic_launcher.png", optimize=True)
         base.save(RES / f"mipmap-{density}" / "ic_launcher_round.png", optimize=True)
 

@@ -28,7 +28,7 @@ Universal APKs include both supported ARM architectures. They use more download 
 
 <AccordionGroup>
   <Accordion title="Android phones and tablets">
-    Use a phone/tablet APK. These builds use touch-first navigation and support Android 5.1 or newer.
+    Use a phone/tablet APK. These builds use touch-first, edge-to-edge navigation and support Android 5.1 or newer.
   </Accordion>
 
   <Accordion title="Android TV and Google TV">
@@ -43,5 +43,21 @@ Universal APKs include both supported ARM architectures. They use more download 
 <Warning>
   Do not install a phone APK on a television just because it is smaller. The TV build provides the remote-first interface and form-factor-specific update path.
 </Warning>
+
+## Playback locks and external players
+
+The lock button in Anilife's player prevents accidental touch, remote and Back-button input until
+you unlock the controls. It is not a security lock. To keep another person out of a profile, set
+its four-digit PIN under **Settings → Profile lock** instead.
+
+The built-in player is the default. You can hand one episode to another installed player from the
+player settings, or enable **Settings → Player → Open episodes in external player** for every
+episode. Compatible apps such as mpvEx, mpv-android and VLC appear through Android's normal video
+app picker. Anilife can pass remote or downloaded video, subtitles and a resume position; the
+receiving player decides which of those it supports and whether it reports progress back.
+
+mpvEx users can configure Anime4K or their own mpv shaders in mpvEx. This is real-time image
+enhancement, not a native 4K source, and it can use more battery and GPU power. Anilife does not
+apply a second upscaler before handing the video over.
 
 If something fails only on one episode source, it may be a provider problem rather than device incompatibility. Include the device model, Android or Fire OS version, selected APK, and whether every source is affected when you report a problem.

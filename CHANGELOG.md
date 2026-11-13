@@ -3,6 +3,35 @@
 This file records user-visible changes to Anilife for Android and TV. Dates use UTC. A version
 stays marked **Unreleased** until its GitHub release is published.
 
+## [Unreleased]
+
+## [0.1.0] - 2026-11-13
+
+First stable Anilife release for Android phones, tablets, Android TV, Google TV, and Fire TV. It
+includes the complete beta.1 and beta.2 feature sets below plus the final tester fixes in this
+section.
+
+### Added
+
+- Documented and verified the existing external-player hand-off for mpvEx, mpv-android, VLC, and
+  other compatible Android players. The built-in player remains the default; custom Anime4K
+  enhancement stays in the external player's configuration.
+
+### Changed
+
+- Restored the smoother beta 1 launch reveal, shortened every theme variant to 2.7 seconds, and
+  bounded the complete hand-off to 2.7-3.2 seconds while preserving tap-to-skip.
+- Enlarged the phone Home wordmark slightly and made its emblem follow the selected theme.
+- Confirmed AndroidX edge-to-edge behavior across supported Android versions and retained the
+  existing in-player screen lock and profile PIN instead of adding duplicate controls.
+
+### Fixed
+
+- Reframed phone and TV launcher icons around the boy-and-leaf emblem without the nested green
+  square, excess empty space, or colour remaining in the monochrome variant.
+- Released the Android TV video surface when Anilife stops so switching back to an HDMI input does
+  not leave a black SurfaceView over audible television content.
+
 ## [0.1.0-beta.2] - 2026-11-07
 
 ### Added
@@ -64,5 +93,7 @@ stays marked **Unreleased** until its GitHub release is published.
 Beta.1 was a Discord tester build and was not claimed as real-device or stable hardware
 validation.
 
+[Unreleased]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.2...v0.1.0
 [0.1.0-beta.2]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/anilifecommunity/android-and-tv/releases/tag/v0.1.0-beta.1

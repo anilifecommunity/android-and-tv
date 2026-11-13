@@ -30,6 +30,12 @@ Start with the smallest check that matches the symptom, then collect a diagnosti
 
 A failure limited to one source is usually different from a device-wide playback failure. Include that distinction in a report.
 
+## Android TV input is black after playback
+
+Update to Anilife 0.1.0 or newer. It releases its video surface when the app stops so the television
+can return cleanly to an HDMI or set-top-box input. On an older build, return to Android TV Home
+before reopening the HDMI input as a temporary workaround.
+
 ## Account or sync fails
 
 Confirm the intended service is still shown as connected in **Settings → Accounts & sync**. Signing in to AniList or MyAnimeList switches the active list service. Retry the action after reconnecting only if the existing session is reported as expired.

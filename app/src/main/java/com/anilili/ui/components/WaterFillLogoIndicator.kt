@@ -49,16 +49,7 @@ fun WaterFillLogoIndicator(
     }
     val logo = ImageBitmap.imageResource(R.drawable.anilili_launcher)
     val accent = MaterialTheme.colorScheme.primary
-    val themedLogo = ColorFilter.colorMatrix(
-        ColorMatrix(
-            floatArrayOf(
-                0.2126f * accent.red, 0.7152f * accent.red, 0.0722f * accent.red, 0f, 0f,
-                0.2126f * accent.green, 0.7152f * accent.green, 0.0722f * accent.green, 0f, 0f,
-                0.2126f * accent.blue, 0.7152f * accent.blue, 0.0722f * accent.blue, 0f, 0f,
-                0f, 0f, 0f, 1f, 0f,
-            ),
-        ),
-    )
+    val themedLogo = themedLogoColorFilter(accent)
     androidx.compose.foundation.layout.Spacer(
         modifier = modifier
             .size(size)
@@ -74,3 +65,15 @@ fun WaterFillLogoIndicator(
             },
     )
 }
+
+internal fun themedLogoColorFilter(accent: androidx.compose.ui.graphics.Color) =
+    ColorFilter.colorMatrix(
+        ColorMatrix(
+            floatArrayOf(
+                0.2126f * accent.red, 0.7152f * accent.red, 0.0722f * accent.red, 0f, 0f,
+                0.2126f * accent.green, 0.7152f * accent.green, 0.0722f * accent.green, 0f, 0f,
+                0.2126f * accent.blue, 0.7152f * accent.blue, 0.0722f * accent.blue, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f,
+            ),
+        ),
+    )

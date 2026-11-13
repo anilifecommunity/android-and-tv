@@ -29,6 +29,7 @@ fun AnililiWordmark(modifier: Modifier = Modifier) {
         Image(
             painter = painterResource(R.drawable.anilife_logo_emblem),
             contentDescription = null,
+            colorFilter = themedLogoColorFilter(MaterialTheme.colorScheme.primary),
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxHeight().aspectRatio(1f),
         )

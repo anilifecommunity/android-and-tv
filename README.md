@@ -67,6 +67,18 @@ builds in **Settings → App → Receive beta updates**; turning it off returns 
 releases only. Corrective builds can retain their visible version while using a higher Android
 build number, so installed users can still receive urgent fixes.
 
+## Playback and display compatibility
+
+AndroidX edge-to-edge is enabled for the whole supported Android range, with screen-specific inset
+handling for system bars and television overscan. The native and embed players share an accidental-
+input screen lock; profiles can separately use a four-digit PIN.
+
+The built-in player remains the default. Anilife can hand remote or downloaded episodes, subtitles,
+headers and resume position to installed video apps through Android's standard intent contract.
+This includes mpvEx, mpv-android, VLC and other compatible players without an app-specific SDK.
+Anime4K and custom shader processing are configured in the external player and are not represented
+as native 4K source quality by Anilife.
+
 ## Privacy and security
 
 Anilife does not send analytics or usage telemetry. Diagnostic reports stay on the device unless a
