@@ -22,6 +22,8 @@ import com.anilili.data.model.SourceVariant
 import com.anilili.data.cache.AppCache
 import com.anilili.data.remote.AiringSeason
 import com.anilili.data.remote.searchHanimeCatalogue
+import com.anilili.data.remote.discoverHanimeCatalogue
+import com.anilili.data.remote.HANIME_GENRE
 import com.anilili.data.remote.ONE_PACE_MEDIA_ID
 import com.anilili.data.remote.isOnePaceMediaId
 import com.anilili.data.remote.matchesOnePaceQuery
@@ -1081,6 +1083,21 @@ class MiruroRepository(
         return (remote + hits).distinctBy { it.id }
     }
 
+    private suspend fun withHanimeGenre(filters: DiscoverFilters, remote: MediaPage, page: Int): MediaPage {
+        if (hideAdult || HANIME_GENRE !in filters.genres) return remote
+        val catalogue = runCatching { anivexa.hanimeCatalogue() }.getOrElse {
+            DiagnosticsLog.throwable("Hanime catalogue unavailable for Browse", it)
+            return remote
+        }
+        val local = discoverHanimeCatalogue(filters, catalogue, page)
+        if (local.items.isEmpty()) return remote
+        return remote.copy(
+            items = (remote.items + local.items).distinctBy { it.id },
+            hasNextPage = remote.hasNextPage || local.hasNextPage,
+            total = remote.total + local.total,
+        )
+    }
+
     suspend fun discover(filters: DiscoverFilters, page: Int = 1, force: Boolean = false): MediaPage {
         // Read at request time, like the dub index below: a title finished a minute ago is already
         // watched. Its hash joins the cache key so a changed library is never answered from a page
@@ -1108,7 +1125,11 @@ class MiruroRepository(
             )
             offline
         }
-        val padded = remote.copy(items = withLocalTitleMatches(filters, remote.items, page))
+        val padded = withHanimeGenre(
+            filters,
+            remote.copy(items = withLocalTitleMatches(filters, remote.items, page)),
+            page,
+        )
         // A plain title search is the one question the device-side hanime catalogue can answer.
         // Once a year, format or studio is also set, the viewer asked AniList something it has no
         // fields for, and appending unfiltered hits would answer a different question. Hiding

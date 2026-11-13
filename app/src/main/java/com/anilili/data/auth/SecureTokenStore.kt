@@ -129,6 +129,8 @@ internal class SecureTokenStore(context: Context, private val slotKey: String = 
         const val KEY_TOKEN_LEGACY = "anilist_token"
         const val KEY_TOKEN_ENCRYPTED = "anilist_token_v2"
         const val KEY_MAL_TOKENS = "mal_tokens_v1"
+        const val KEY_ANILIST_PENDING_AUTH = "anilist_pending_auth_v1"
+        const val KEY_MAL_PENDING_AUTH = "mal_pending_auth_v1"
         const val KEY_OPEN_SUBTITLES_CREDENTIALS = "opensubtitles_credentials_v1"
         const val KEY_DISCORD_TOKENS = "discord_tokens_v1"
 

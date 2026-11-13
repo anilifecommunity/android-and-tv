@@ -222,11 +222,11 @@ The phone runs a **second, separate authorization** for the TV rather than copyi
 AniList issues a fresh JWT per authorization, so each device gets an independent credential and
 logging out on one does not disturb the other.
 
-> **Code hazard.** `AuthManager.authorizeUrl()` stashes `pendingOAuthState` in an object singleton
-> and `extractToken()` validates against it
+> **State boundary.** `AuthManager.authorizeUrl()` stores the pending OAuth state in the encrypted,
+> profile-scoped auth store and `extractToken()` validates the callback against it.
 > ([`AuthManager.kt:51`](../app/src/main/java/com/anilili/data/auth/AuthManager.kt#L51)).
 > A pairing authorization must not clobber the phone's own login state — give the pairing flow its
-> own state value instead of mutating the singleton.
+  > own state value instead of replacing the local pending authorization.
 
 ### MyAnimeList
 

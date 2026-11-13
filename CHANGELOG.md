@@ -5,6 +5,23 @@ stays marked **Unreleased** until its GitHub release is published.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-13
+
+### Changed
+
+- Made Cinema the default layout for new installs and unset preferences while preserving an
+  existing explicit Legacy selection.
+
+### Fixed
+
+- Completed AniList and MyAnimeList sign-in inside Anilife instead of allowing the public web app
+  and a second navigation rail to open inside the login window.
+- Persisted each pending OAuth state and MyAnimeList PKCE verifier securely across activity and
+  process recreation, and rejected callbacks whose host, path, service, or state does not match.
+- Suppressed every native navigation surface while an authentication screen owns the app chrome.
+- Added the device-side adult catalogue to Hentai genre browsing when the viewer has explicitly
+  turned off **Hide adult content**; the safety setting remains on by default.
+
 ## [0.1.0] - 2026-11-13
 
 First stable Anilife release for Android phones, tablets, Android TV, Google TV, and Fire TV. It
@@ -93,7 +110,8 @@ section.
 Beta.1 was a Discord tester build and was not claimed as real-device or stable hardware
 validation.
 
-[Unreleased]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.2...v0.1.0
 [0.1.0-beta.2]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.1...v0.1.0-beta.2
 [0.1.0-beta.1]: https://github.com/anilifecommunity/android-and-tv/releases/tag/v0.1.0-beta.1

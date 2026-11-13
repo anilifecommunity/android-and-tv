@@ -634,9 +634,19 @@ fun LoginWebView(
                             webViewClient = object : WebViewClient() {
                                 private fun handleRedirect(view: WebView?, url: String?): Boolean {
                                     if (tokenHandled || url == null || !isRedirect(url)) return false
-                                    val result = extractResult(url) ?: return false
                                     tokenHandled = true
                                     view?.stopLoading()
+                                    val result = extractResult(url)
+                                    if (result == null) {
+                                        pageLoading = false
+                                        loadProblem = LoginLoadProblem.INVALID_RETURN
+                                        DiagnosticsLog.event(
+                                            category = "auth",
+                                            name = "oauth.invalid_return",
+                                            attributes = mapOf("host" to url.oauthHost()),
+                                        )
+                                        return true
+                                    }
                                     onResult(result)
                                     return true
                                 }
@@ -1060,6 +1070,10 @@ internal enum class LoginLoadProblem(
     HTTP(
         title = "The login service returned an error.",
         guidance = "The service may be temporarily unavailable. Try again shortly.",
+    ),
+    INVALID_RETURN(
+        title = "The login return could not be verified.",
+        guidance = "Close this page and start sign-in again.",
     ),
     WEBVIEW_UNAVAILABLE(
         title = "Secure login isn't available on this device.",

@@ -362,7 +362,10 @@ fun ProfileScreen(
                     vm.onLoggedIn(it)
                     confirmSignedIn(context, "AniList")
                 },
-                onCancel = { loginService = null },
+                onCancel = {
+                    AuthManager.cancelPendingAuthorization()
+                    loginService = null
+                },
             )
             return
         }
@@ -372,7 +375,10 @@ fun ProfileScreen(
                 isRedirect = MalAuthManager::isRedirect,
                 extractResult = MalAuthManager::extractCode,
                 onResult = { loginService = null; vm.onMalCode(it) },
-                onCancel = { loginService = null },
+                onCancel = {
+                    MalAuthManager.cancelPendingAuthorization()
+                    loginService = null
+                },
             )
             return
         }

@@ -5,10 +5,11 @@ import org.junit.Test
 
 class AppLayoutModeTest {
     @Test
-    fun storedValueDefaultsToLegacy() {
-        assertEquals(AppLayoutMode.LEGACY, AppLayoutMode.fromStored(null))
-        assertEquals(AppLayoutMode.LEGACY, AppLayoutMode.fromStored("future-mode"))
+    fun storedValueDefaultsToCinemaWhilePreservingLegacy() {
+        assertEquals(AppLayoutMode.CINEMA, AppLayoutMode.fromStored(null))
+        assertEquals(AppLayoutMode.CINEMA, AppLayoutMode.fromStored("future-mode"))
         assertEquals(AppLayoutMode.CINEMA, AppLayoutMode.fromStored("cinema"))
+        assertEquals(AppLayoutMode.LEGACY, AppLayoutMode.fromStored("legacy"))
     }
 
     @Test

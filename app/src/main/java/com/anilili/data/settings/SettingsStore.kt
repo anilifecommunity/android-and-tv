@@ -207,7 +207,7 @@ enum class AppLayoutMode(val storedValue: String, val label: String) {
 
     companion object {
         fun fromStored(value: String?): AppLayoutMode =
-            entries.firstOrNull { it.storedValue == value } ?: LEGACY
+            entries.firstOrNull { it.storedValue == value } ?: CINEMA
     }
 }
 
@@ -1168,7 +1168,7 @@ object SettingsStore {
     private val _formFactorPreference = MutableStateFlow(FormFactorPreference.AUTOMATIC)
     val formFactorPreference = _formFactorPreference.asStateFlow()
 
-    private val _appLayoutMode = MutableStateFlow(AppLayoutMode.LEGACY)
+    private val _appLayoutMode = MutableStateFlow(AppLayoutMode.CINEMA)
     val appLayoutMode = _appLayoutMode.asStateFlow()
 
     /**

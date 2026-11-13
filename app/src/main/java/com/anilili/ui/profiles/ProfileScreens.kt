@@ -1170,7 +1170,10 @@ private fun AccountStep(profile: LocalProfile, onDone: () -> Unit) {
                     AccountAdoption.adoptAniList(value)
                     confirmSignedIn(context, "AniList")
                 },
-                onCancel = { flow = null },
+                onCancel = {
+                    AuthManager.cancelPendingAuthorization()
+                    flow = null
+                },
             )
             return
         }
@@ -1197,7 +1200,10 @@ private fun AccountStep(profile: LocalProfile, onDone: () -> Unit) {
                         }
                     }
                 },
-                onCancel = { flow = null },
+                onCancel = {
+                    MalAuthManager.cancelPendingAuthorization()
+                    flow = null
+                },
             )
             return
         }

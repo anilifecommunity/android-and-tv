@@ -996,7 +996,7 @@ private fun MiruroRoot(
             Scaffold(
                 containerColor = canvasColor(),
             ) { innerPadding ->
-                val showTvTopNavigation = deviceProfile.isTv && !cinema &&
+                val showTvTopNavigation = !chromeTakeover.active && deviceProfile.isTv && !cinema &&
                     (showBottomBar || currentRoute == Routes.DETAIL)
                 // The canvas is painted inside the capsule's blur source, so the glass frosts the
                 // background picture too rather than showing it sharp through a tint.
@@ -1008,7 +1008,8 @@ private fun MiruroRoot(
                                 bottom = if (hasPhoneBottomBar) 0.dp else innerPadding.calculateBottomPadding(),
                             ),
                     ) {
-                        if (showPhoneNavigation && (deviceProfile.useNavigationRail && !deviceProfile.isTv ||
+                        if (!chromeTakeover.active && showPhoneNavigation &&
+                            (deviceProfile.useNavigationRail && !deviceProfile.isTv ||
                                 deviceProfile.isTv && cinema)) {
                             AppNavigationRail(
                                 currentRoute = currentRoute,

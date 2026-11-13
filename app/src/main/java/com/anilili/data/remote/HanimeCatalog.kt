@@ -1,7 +1,9 @@
 package com.anilili.data.remote
 
 import com.anilili.data.model.CoverImage
+import com.anilili.data.model.DiscoverFilters
 import com.anilili.data.model.Media
+import com.anilili.data.model.MediaPage
 import com.anilili.data.model.MediaTag
 import com.anilili.data.model.MediaTitle
 import com.anilili.data.model.StreamItem
@@ -253,6 +255,47 @@ fun searchHanimeCatalogue(
             .thenBy { hanimeTitleWithoutEpisode(it.first.first().name) })
         .take(limit)
         .mapNotNull { (episodes, _) -> hanimeSeriesAsMedia(episodes) }
+}
+
+/** A real Browse page for the Hentai genre when the viewer has explicitly enabled adult content. */
+fun discoverHanimeCatalogue(
+    filters: DiscoverFilters,
+    catalogue: List<HanimeVideo>,
+    page: Int,
+    pageSize: Int = 50,
+): MediaPage {
+    if (page < 1 || pageSize < 1 || HANIME_GENRE !in filters.genres ||
+        HANIME_GENRE in filters.excludedGenres || filters.studioId != null ||
+        filters.season != null || filters.status != null || filters.format != null ||
+        filters.country != null || filters.source != null || filters.minimumScore != null ||
+        filters.dubbedOnly) {
+        return MediaPage(emptyList(), hasNextPage = false, page = page)
+    }
+    val series = if (filters.query.isBlank()) {
+        catalogue.groupBy(HanimeVideo::seriesSlug).values
+            .mapNotNull(::hanimeSeriesAsMedia)
+            .sortedBy { it.title.userPreferred ?: it.title.romaji.orEmpty() }
+    } else {
+        searchHanimeCatalogue(filters.query, catalogue, limit = Int.MAX_VALUE)
+    }
+    val matches = series.filter { media ->
+        val year = media.seasonYear
+        val tags = media.tags.map { it.name }.toSet()
+        (filters.tags.isEmpty() || tags.any(filters.tags::contains)) &&
+            tags.none(filters.excludedTags::contains) &&
+            (filters.year == null || year == filters.year) &&
+            (filters.yearFrom == null || year != null && year >= filters.yearFrom) &&
+            (filters.yearTo == null || year != null && year <= filters.yearTo) &&
+            (filters.episodesMin == null || (media.episodes ?: 0) >= filters.episodesMin) &&
+            (filters.episodesMax == null || (media.episodes ?: Int.MAX_VALUE) <= filters.episodesMax)
+    }
+    val start = (page - 1) * pageSize
+    return MediaPage(
+        items = matches.drop(start).take(pageSize),
+        hasNextPage = start + pageSize < matches.size,
+        page = page,
+        total = matches.size,
+    )
 }
 
 /** Exact beats prefix beats substring beats fuzzy; anything weaker is not a result at all. */
