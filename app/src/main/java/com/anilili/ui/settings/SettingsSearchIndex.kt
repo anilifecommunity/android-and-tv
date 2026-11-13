@@ -40,7 +40,7 @@ internal fun settingsSearchEntries(isTv: Boolean): List<SettingsSearchEntry> = b
                 listOf("external", "video", "player", "vlc", "mpv", "automatic"),
             "External player" to
                 listOf("external", "video", "player", "app", "open with", "chooser", "default",
-                    "vlc", "mpv", "mpvnova", "nova", "mx player", "just player", "vimu"),
+                    "vlc", "mpv", "mpvex", "mpvnova", "nova", "mx player", "just player", "vimu"),
             "Autoplay next episode" to listOf("autoplay", "next", "continue", "binge"),
             "Keep playing in a mini player" to
                 listOf("mini", "pip", "picture in picture", "floating", "background", "home"),

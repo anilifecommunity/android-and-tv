@@ -19,4 +19,11 @@ class LaunchIntroThemeTest {
         assertEquals(R.raw.launch_intro_h224, launchIntroResource(ThemeAccent.CUSTOM, 0xFF3B82F6.toInt()))
         assertEquals(R.raw.launch_intro_monochrome, launchIntroResource(ThemeAccent.CUSTOM, 0xFF777777.toInt()))
     }
+
+    @Test
+    fun `launch exits after first frame plus bounded twenty five percent grace`() {
+        assertEquals(2_450L, launchIntroExitStartMillis(400L))
+        assertEquals(2_750L, launchIntroExitStartMillis(2_400L))
+        assertEquals(2_950L, launchIntroExitStartMillis(4_000L))
+    }
 }

@@ -402,7 +402,7 @@ private fun HomeTopChrome(
         TopAppBar(
             title = {
                 if (showWordmark) {
-                    AnililiWordmark(modifier = Modifier.height(34.dp))
+                    AnililiWordmark(modifier = Modifier.height(38.dp))
                 }
             },
             actions = {

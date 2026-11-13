@@ -1,6 +1,10 @@
 package com.anilili.ui.watch
 
+import androidx.lifecycle.Lifecycle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlayerSystemBarsTest {
@@ -63,5 +67,13 @@ class PlayerSystemBarsTest {
                 statusBarOverPlayer = false,
             ),
         )
+    }
+
+    @Test
+    fun tvSurfaceLeavesTheDisplayWhenTheActivityStops() {
+        assertFalse(tvPlayerSurfaceAttached(Lifecycle.Event.ON_STOP)!!)
+        assertTrue(tvPlayerSurfaceAttached(Lifecycle.Event.ON_START)!!)
+        assertTrue(tvPlayerSurfaceAttached(Lifecycle.Event.ON_RESUME)!!)
+        assertNull(tvPlayerSurfaceAttached(Lifecycle.Event.ON_PAUSE))
     }
 }

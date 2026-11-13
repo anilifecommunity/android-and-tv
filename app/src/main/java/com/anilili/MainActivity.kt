@@ -13,6 +13,7 @@ import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Rational
 import android.view.KeyEvent
 import android.view.View
@@ -202,6 +203,8 @@ import com.anilili.ui.components.LocalAppChromeTakeover
 import com.anilili.ui.components.AppLaunchSplash
 import com.anilili.ui.components.VideoLaunchSplash
 import com.anilili.ui.components.VideoLaunchSplashExitMillis
+import com.anilili.ui.components.LaunchIntroMaximumTotalMillis
+import com.anilili.ui.components.launchIntroExitStartMillis
 import com.anilili.ui.components.launchIntroResource
 import com.anilili.ui.components.FloatingNavBarExpandedHeight
 import com.anilili.ui.components.FloatingNavBarMargin
@@ -251,6 +254,7 @@ class MainActivity : FragmentActivity() {
     private var pictureInPictureReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        val launchStartedAt = SystemClock.elapsedRealtime()
         DiagnosticsLog.event("MainActivity.onCreate start savedState=${savedInstanceState != null}")
         window.setBackgroundDrawable(ColorDrawable(Color.BLACK))
         window.decorView.setBackgroundColor(Color.BLACK)
@@ -300,7 +304,10 @@ class MainActivity : FragmentActivity() {
         handleAuthRedirect(intent)
         DiagnosticsLog.event("MainActivity.setContent start")
         setContent {
+            var appReadyAfterMillis by remember { mutableStateOf<Long?>(null) }
             LaunchedEffect(Unit) {
+                withFrameNanos {}
+                appReadyAfterMillis = SystemClock.elapsedRealtime() - launchStartedAt
                 DiagnosticsLog.event("MainActivity content composed")
             }
             MiruroTheme {
@@ -318,6 +325,16 @@ class MainActivity : FragmentActivity() {
                         var showLaunchSplash by rememberSaveable { mutableStateOf(true) }
                         val launchSplashState = remember { MutableTransitionState(showLaunchSplash) }
                         launchSplashState.targetState = showLaunchSplash
+                        LaunchedEffect(appReadyAfterMillis) {
+                            val readyAfter = appReadyAfterMillis ?: return@LaunchedEffect
+                            val exitAt = launchIntroExitStartMillis(readyAfter)
+                            delay((exitAt - (SystemClock.elapsedRealtime() - launchStartedAt)).coerceAtLeast(0L))
+                            showLaunchSplash = false
+                        }
+                        LaunchedEffect(Unit) {
+                            delay(LaunchIntroMaximumTotalMillis - VideoLaunchSplashExitMillis)
+                            showLaunchSplash = false
+                        }
                         // "Who's watching?" waits until the splash has finished leaving, not just
                         // started to: its dialog window draws above the activity, so opening it on
                         // the exit put it over the last of the intro.
@@ -575,6 +592,7 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         DiagnosticsLog.event("MainActivity.onStop")
         PlaybackService.pauseActivePlayback()
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     override fun onDestroy() {

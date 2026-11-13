@@ -25,7 +25,7 @@ import com.anilili.errors.report
  * There is no agreed way to pass any of this. Every player invented its own extras and they do not
  * overlap, so the request carries all of the spellings at once and each player reads the ones it
  * knows; unknown extras are ignored by everyone. The spellings below are the documented ones for MX
- * Player, VLC, Just Player, Vimu, mpv-android and Nova.
+ * Player, VLC, Just Player, Vimu, mpv-android, mpvEx and Nova.
  *
  * mpvNova needs no spelling of its own: it is a fork of mpv-android and its trampoline copies a
  * fixed allowlist of extras through to the real player, which already contains every mpv-android

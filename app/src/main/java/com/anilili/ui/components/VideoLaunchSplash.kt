@@ -45,25 +45,32 @@ import kotlin.math.min
  * can spend four seconds composing the app behind before the clip shows, and a ceiling counted from
  * launch cut the clip off mid-way there.
  */
-private const val VideoLaunchSplashFirstFrameCeilingMillis = 8_000L
-
-/**
- * How far past the clip's own length the intro may run once it is playing, for a clip that stalls.
- */
-private const val VideoLaunchSplashPlaybackSlackMillis = 2_000L
+private const val VideoLaunchSplashFirstFrameCeilingMillis = 1_000L
 
 /**
  * How long the hand-over to the app takes. The splash starts leaving this far before the clip's
  * end, so the cross-fade happens over the last of the motion instead of on a frozen final frame,
  * and the picture fades into the app.
  */
-const val VideoLaunchSplashExitMillis = 700
+const val VideoLaunchSplashExitMillis = 250
+internal const val LaunchIntroMaximumTotalMillis = 3_200L
+private const val LaunchIntroMinimumTotalMillis = 2_700L
+
+/** First app frame plus a 25% grace period, bounded to the requested 2.7-3.2 second launch. */
+internal fun launchIntroExitStartMillis(appReadyAfterMillis: Long): Long {
+    val ready = appReadyAfterMillis.coerceAtLeast(0L)
+    val total = (ready + ready / 4).coerceIn(
+        LaunchIntroMinimumTotalMillis,
+        LaunchIntroMaximumTotalMillis,
+    )
+    return total - VideoLaunchSplashExitMillis
+}
 
 /**
  * The supplied Anilife startup animation, transcoded to an efficient bundled MP4.
  *
- * Plays once from the APK, then hands over on the clip's end, on an error, on the ceilings above, or
- * on a click. The player owns a hardware decoder for as long as it lives; on the single-decoder
+ * Plays once from the APK until the measured launch hand-over, an error, the first-frame ceiling,
+ * or a click. The player owns a hardware decoder for as long as it lives; on the single-decoder
  * SoCs many TV boxes carry, that is the same decoder the episode player needs — so it is released
  * the moment this leaves composition, never kept around for a replay.
  */
@@ -107,7 +114,6 @@ fun VideoLaunchSplash(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
                     DiagnosticsLog.event("Launch intro ended after ${SystemClock.elapsedRealtime() - startedAt}ms")
-                    finish()
                 }
             }
 
@@ -131,21 +137,6 @@ fun VideoLaunchSplash(
             finish()
             return@LaunchedEffect
         }
-        // Leave once only the exit's worth of the clip remains.
-        val playingSince = SystemClock.elapsedRealtime()
-        while (true) {
-            val duration = player.duration
-            if (duration > 0 && duration - player.currentPosition <= VideoLaunchSplashExitMillis) break
-            if (player.playbackState == Player.STATE_ENDED) break
-            if (duration > 0 &&
-                SystemClock.elapsedRealtime() - playingSince > duration + VideoLaunchSplashPlaybackSlackMillis
-            ) {
-                DiagnosticsLog.event("Launch intro stalled; left ${player.currentPosition}ms into the clip")
-                break
-            }
-            delay(30)
-        }
-        finish()
     }
     BoxWithConstraints(
         modifier
