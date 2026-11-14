@@ -70,7 +70,8 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v0\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
           [[ "$EXPIRES_IN_DAYS" =~ ^[1-9][0-9]*$ ]]
-          release_json="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG")"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" > release.json
+          release_json="$(cat release.json)"
           test "$(jq -r '.draft' <<<"$release_json")" = "false"
           if [[ "$UPDATE_CHANNEL" = beta ]]; then
             test "$(jq -r '.prerelease' <<<"$release_json")" = "true"
@@ -81,8 +82,15 @@ jobs:
           fi
           mkdir release
           gh release download "$RELEASE_TAG" --dir release
-          test -s release/Anilife.apk
-          test -s release/Anilife_tv.apk
+          for apk in \
+            Anilife.apk \
+            Anilife_arm64-v8a.apk \
+            Anilife_armeabi-v7a.apk \
+            Anilife_tv.apk \
+            Anilife_tv_arm64-v8a.apk \
+            Anilife_tv_armeabi-v7a.apk; do
+            test -s "release/$apk"
+          done
           test -s release/SHA256SUMS
           (cd release && sha256sum --check SHA256SUMS)
 
@@ -152,3 +160,66 @@ jobs:
           set -euo pipefail
           gh release upload "$RELEASE_TAG" update.json --clobber
           python scripts/nostr_update.py broadcast-file update.json
+
+      - name: Build stable web download index
+        if: ${{ inputs.channel == 'stable' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/release_download_index.py \
+            --release-json release.json \
+            --event update.json \
+            --checksums release/SHA256SUMS \
+            --asset-dir release \
+            --repository "$GITHUB_REPOSITORY" \
+            --output downloads.json
+
+      - name: Publish and verify stable web download index
+        if: ${{ inputs.channel == 'stable' }}
+        shell: bash
+        env:
+          WEB_RELEASE_INDEX_HMAC_KEY: ${{ secrets.WEB_RELEASE_INDEX_HMAC_KEY }}
+          WEB_RELEASE_INDEX_PUBLISH_URL: ${{ vars.WEB_RELEASE_INDEX_PUBLISH_URL }}
+          WEB_RELEASE_INDEX_PUBLIC_URL: ${{ vars.WEB_RELEASE_INDEX_PUBLIC_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$WEB_RELEASE_INDEX_HMAC_KEY"
+          test -n "$WEB_RELEASE_INDEX_PUBLISH_URL"
+          test -n "$WEB_RELEASE_INDEX_PUBLIC_URL"
+
+          timestamp="$(date +%s)"
+          signature="$(INDEX_TIMESTAMP="$timestamp" python - <<'PY'
+          import hashlib
+          import hmac
+          import os
+          from pathlib import Path
+
+          body = Path("downloads.json").read_bytes()
+          message = os.environ["INDEX_TIMESTAMP"].encode() + b"\n" + body
+          print(hmac.new(os.environ["WEB_RELEASE_INDEX_HMAC_KEY"].encode(), message, hashlib.sha256).hexdigest())
+          PY
+          )"
+
+          curl --fail-with-body --silent --show-error --retry 2 \
+            --request POST "$WEB_RELEASE_INDEX_PUBLISH_URL" \
+            --header "Content-Type: application/json" \
+            --header "X-Anilife-Timestamp: $timestamp" \
+            --header "X-Anilife-Signature: v1=$signature" \
+            --data-binary @downloads.json \
+            --output publish-response.json
+
+          expected_sha256="$(sha256sum downloads.json | cut -d' ' -f1)"
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error \
+              --header "Cache-Control: no-cache" \
+              "$WEB_RELEASE_INDEX_PUBLIC_URL?verify=$timestamp" \
+              --output live-downloads.json; then
+              live_sha256="$(sha256sum live-downloads.json | cut -d' ' -f1)"
+              if [[ "$live_sha256" = "$expected_sha256" ]]; then
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Published web download index did not become visible within 60 seconds" >&2
+          exit 1
