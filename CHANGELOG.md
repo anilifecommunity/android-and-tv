@@ -5,6 +5,15 @@ stays marked **Unreleased** until its GitHub release is published.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-14
+
+### Fixed
+
+- Added the active profile avatar to Cinema's navigation rail so phone, tablet and TV rail layouts
+  can open the existing guarded profile switcher without leaving Anilife. Legacy remains unchanged.
+- Reused Discord's registered mobile callback for TV sign-in instead of the unregistered loopback
+  path that Discord rejected with `Invalid OAuth2 redirect_uri`.
+
 ## [0.1.1] - 2026-11-13
 
 ### Changed
@@ -110,7 +119,8 @@ section.
 Beta.1 was a Discord tester build and was not claimed as real-device or stable hardware
 validation.
 
-[Unreleased]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.2...v0.1.0
 [0.1.0-beta.2]: https://github.com/anilifecommunity/android-and-tv/compare/v0.1.0-beta.1...v0.1.0-beta.2
