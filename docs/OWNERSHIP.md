@@ -27,6 +27,7 @@ protected repository variables and local ignored configuration; blank values dis
 | --- | --- | --- |
 | `ANILIST_CLIENT_ID` | AniList application owner | User-authorised AniList library access. |
 | `MAL_CLIENT_ID` | MyAnimeList API client owner | User-authorised MyAnimeList library access. |
+| `MAL_REDIRECT_URI` | MyAnimeList API client owner | Exact callback paired with the public MAL client. |
 | `SIMKL_CLIENT_ID` | Simkl API client owner | User-authorised Simkl library access. |
 | `DISCORD_APPLICATION_ID` | Anilife Discord application owner | Optional user-authorised Rich Presence. |
 | `DISCORD_INVITE_URL` | Anilife Discord server administrator | Public community invite shown in About and presence. |

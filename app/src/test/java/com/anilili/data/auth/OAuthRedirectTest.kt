@@ -37,6 +37,15 @@ class OAuthRedirectTest {
         assertEquals(
             "mal-code",
             validatedOAuthResult(
+                "https://localhost/?code=mal-code&state=s",
+                OAuthService.MAL,
+                "s",
+                "code",
+            ),
+        )
+        assertEquals(
+            "mal-code",
+            validatedOAuthResult(
                 "anilife://auth/mal?code=mal-code&state=s",
                 OAuthService.MAL,
                 "s",

@@ -38,6 +38,7 @@ private data class MalPendingAuth(val state: String, val verifier: String)
  */
 object MalAuthManager {
     val CLIENT_ID: String get() = BuildConfig.MAL_CLIENT_ID
+    private val REDIRECT_URI: String get() = BuildConfig.MAL_REDIRECT_URI
     private const val AUTHORIZE_ENDPOINT = "https://myanimelist.net/v1/oauth2/authorize"
     private const val TOKEN_ENDPOINT = "https://myanimelist.net/v1/oauth2/token"
 
@@ -67,7 +68,7 @@ object MalAuthManager {
     }
 
     val isLoggedIn: Boolean get() = _tokens.value != null
-    val isConfigured: Boolean get() = CLIENT_ID.isNotBlank()
+    val isConfigured: Boolean get() = CLIENT_ID.isNotBlank() && REDIRECT_URI.isNotBlank()
 
     fun authorizeUrl(): String {
         check(isConfigured) { "MyAnimeList is not configured for this Anilife build." }
@@ -79,6 +80,7 @@ object MalAuthManager {
         return Uri.parse(AUTHORIZE_ENDPOINT).buildUpon()
             .appendQueryParameter("response_type", "code")
             .appendQueryParameter("client_id", CLIENT_ID)
+            .appendQueryParameter("redirect_uri", REDIRECT_URI)
             .appendQueryParameter("state", state)
             .appendQueryParameter("code_challenge", verifier)
             .appendQueryParameter("code_challenge_method", "plain")
@@ -111,6 +113,7 @@ object MalAuthManager {
         Uri.parse(AUTHORIZE_ENDPOINT).buildUpon()
             .appendQueryParameter("response_type", "code")
             .appendQueryParameter("client_id", CLIENT_ID)
+            .appendQueryParameter("redirect_uri", REDIRECT_URI)
             .appendQueryParameter("state", state)
             .appendQueryParameter("code_challenge", challenge)
             .appendQueryParameter("code_challenge_method", "plain")
@@ -135,6 +138,7 @@ object MalAuthManager {
             .add("client_id", CLIENT_ID)
             .add("grant_type", "authorization_code")
             .add("code", code)
+            .add("redirect_uri", REDIRECT_URI)
             .add("code_verifier", verifier)
             .build()
         store(requestTokens(body))

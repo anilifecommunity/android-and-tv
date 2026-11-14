@@ -8,6 +8,7 @@ variables. Never commit filled values.
 | --- | --- | --- |
 | `ANILIST_CLIENT_ID` | Public AniList OAuth client ID | AniList sign-in is disabled. |
 | `MAL_CLIENT_ID` | Public MyAnimeList OAuth client ID | MyAnimeList sign-in is disabled. |
+| `MAL_REDIRECT_URI` | Exact redirect registered to the public MyAnimeList client | MyAnimeList sign-in is disabled. |
 | `SIMKL_CLIENT_ID` | Public Simkl OAuth client ID | Simkl sign-in is disabled. |
 | `DISCORD_APPLICATION_ID` | Public Discord application ID | Discord presence is disabled. |
 | `DISCORD_INVITE_URL` | Public HTTPS community invite | The About link is disabled. |
@@ -19,7 +20,7 @@ variables. Never commit filled values.
 
 Android clients must not contain OAuth client secrets, Discord bot tokens, signing material, or
 credentials that are not authorised for redistribution. The canonical callback scheme is
-`anilife://`.
+`anilife://`; MyAnimeList uses its separately registered `https://localhost/` callback.
 
 `TMDB_READ_TOKEN` belongs to the separate Media Index build and must not be compiled into the
 Android application.

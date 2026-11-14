@@ -20,8 +20,8 @@ val diagnosticBuildSha = providers.environmentVariable("GITHUB_SHA").orNull
             isIgnoreExitValue = true
         }.standardOutput.asText.get().trim()
     }.getOrDefault("unknown").ifBlank { "unknown" }
-val appVersionCode = 5
-val appVersionName = "0.1.2"
+val appVersionCode = 6
+val appVersionName = "0.1.3"
 
 tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
     componentName = "Anilife"
@@ -47,6 +47,7 @@ fun buildConfigString(value: String): String =
 
 val anilistClientId = infrastructureValue("ANILIST_CLIENT_ID", "anilistClientId")
 val malClientId = infrastructureValue("MAL_CLIENT_ID", "malClientId")
+val malRedirectUri = infrastructureValue("MAL_REDIRECT_URI", "malRedirectUri")
 val simklClientId = infrastructureValue("SIMKL_CLIENT_ID", "simklClientId")
 val discordApplicationId = infrastructureValue("DISCORD_APPLICATION_ID", "discordApplicationId")
 val discordInviteUrl = infrastructureValue("DISCORD_INVITE_URL", "discordInviteUrl")
@@ -76,6 +77,7 @@ android {
         buildConfigField("String", "GIT_SHA", buildConfigString(diagnosticBuildSha))
         buildConfigField("String", "ANILIST_CLIENT_ID", buildConfigString(anilistClientId))
         buildConfigField("String", "MAL_CLIENT_ID", buildConfigString(malClientId))
+        buildConfigField("String", "MAL_REDIRECT_URI", buildConfigString(malRedirectUri))
         buildConfigField("String", "SIMKL_CLIENT_ID", buildConfigString(simklClientId))
         buildConfigField("String", "DISCORD_APPLICATION_ID", buildConfigString(discordApplicationId))
         buildConfigField("String", "DISCORD_INVITE_URL", buildConfigString(discordInviteUrl))
