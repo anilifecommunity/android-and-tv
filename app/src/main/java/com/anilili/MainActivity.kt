@@ -1777,6 +1777,12 @@ private fun AppNavigationRail(
                     .background(railFocus.background(ComposeColor.Transparent), RoundedCornerShape(12.dp)),
             )
         }
+        if (cinema) {
+            Spacer(Modifier.weight(1f))
+            com.anilili.ui.profiles.ProfileSwitchButton(
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+        }
     }
 }
 

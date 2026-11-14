@@ -613,11 +613,8 @@ fun SettingsScreen(
      *
      * The browser is preferred on a phone because the viewer is usually already signed in to
      * Discord there and only has to press Authorize — no password typed into a window this app
-     * drew. A television always takes the in-app WebView with the loopback redirect, exactly as
-     * the AniList and MyAnimeList sign-ins do, even when something answers `https://`: TV
-     * browsers are typically WebView shells that load the `discord-<id>:` redirect themselves
-     * instead of handing it to Android, and strand the viewer on `ERR_UNKNOWN_URL_SCHEME` with a
-     * perfectly good code in the address bar. Nobody is signed in to Discord in one anyway.
+     * drew. A television uses the in-app WebView with the same registered mobile redirect;
+     * LoginWebView consumes that return before Chromium tries to load the custom scheme.
      */
     fun startDiscordLogin() {
         discordError = null
@@ -625,7 +622,7 @@ fun SettingsScreen(
         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.com"))
         val hasBrowser = !device.isTv && context.packageManager.resolveActivity(browserIntent, 0) != null
         if (hasBrowser) {
-            val url = DiscordAuthManager.authorizeUrl(DiscordRedirect.BROWSER)
+            val url = DiscordAuthManager.authorizeUrl(DiscordRedirect.MOBILE)
             val opened = runCatching {
                 context.startActivity(
                     Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -634,7 +631,7 @@ fun SettingsScreen(
             }.isSuccess
             if (opened) return
         }
-        discordLoginUrl = DiscordAuthManager.authorizeUrl(DiscordRedirect.LOOPBACK)
+        discordLoginUrl = DiscordAuthManager.authorizeUrl(DiscordRedirect.MOBILE)
     }
 
     CompiledSeparately {

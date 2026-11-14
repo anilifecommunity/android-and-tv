@@ -6,6 +6,7 @@ import android.util.Base64
 import com.anilili.BuildConfig
 import com.anilili.data.auth.SecureTokenStore
 import com.anilili.diagnostics.DiagnosticsLog
+import java.net.URI
 import java.security.MessageDigest
 import java.security.SecureRandom
 import kotlinx.coroutines.Dispatchers
@@ -44,9 +45,8 @@ data class DiscordAccount(
 )
 
 /**
- * Where Discord is told to send the viewer back to. Both are registered on the application, and
- * which one an authorization uses decides which surface can complete it — so the redirect a
- * session started with has to be the one its token exchange presents, or Discord rejects the code.
+ * Discord's registered mobile return. The system browser and the in-app TV WebView both hand it
+ * back to Android before trying to load the custom scheme.
  */
 enum class DiscordRedirect(val uri: String) {
     /**
@@ -54,18 +54,7 @@ enum class DiscordRedirect(val uri: String) {
      * Handed to the system browser, where the viewer is usually already signed in to Discord and
      * only has to press Authorize. [DiscordOAuthCallbackActivity] catches the answer.
      */
-    BROWSER("discord-${DiscordAuthManager.APPLICATION_ID}:/authorize/callback"),
-
-    /**
-     * A loopback URL nothing ever really opens: the in-app login WebView recognises it and reads
-     * the code straight out of the address, exactly as the AniList and MyAnimeList logins do. This
-     * is the only path that works on a television, where there is frequently no browser at all.
-     *
-     * `127.0.0.1` rather than `localhost` because that is the form Discord documents and the one
-     * its portal is known to accept; [DiscordAuthManager] recognises either coming back, so a
-     * redirect registered under the other name still completes.
-     */
-    LOOPBACK("http://127.0.0.1/discord/callback"),
+    MOBILE("discord-${DiscordAuthManager.APPLICATION_ID}:/authorize/callback"),
 }
 
 /**
@@ -121,13 +110,6 @@ object DiscordAuthManager {
 
     /** Refresh this long before the reported expiry so an in-flight presence update never races it. */
     private const val EXPIRY_MARGIN_MS = 5L * 60 * 1000
-
-    /**
-     * Both spellings of the loopback are recognised on the way back. The token exchange presents
-     * whichever was registered — it is read from the pending session, not assumed — so this only
-     * has to be permissive enough to notice the redirect landing.
-     */
-    private val LOOPBACK_HOSTS = setOf("127.0.0.1", "localhost")
 
     private val json = Json { ignoreUnknownKeys = true }
     private lateinit var tokenStore: SecureTokenStore
@@ -332,18 +314,12 @@ object DiscordAuthManager {
     /**
      * The redirect as a URI, or null when the URL is some other page.
      *
-     * Both registered forms are recognised because either surface may be the one that finishes:
-     * the custom scheme carries its answer on a single-slash path, so `Uri` reports the whole
+     * The custom scheme carries its answer on a single-slash path, so `Uri` reports the whole
      * `/authorize/callback` as the path with no authority at all.
      */
     private fun parseRedirect(url: String): Uri? {
-        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
-        val answered = uri.getQueryParameter("code") != null || uri.getQueryParameter("error") != null
-        if (!answered) return null
-        val browser = uri.scheme == "discord-$APPLICATION_ID" && uri.path == "/authorize/callback"
-        val loopback = (uri.scheme == "http" || uri.scheme == "https") &&
-            uri.host in LOOPBACK_HOSTS && uri.path == "/discord/callback"
-        return uri.takeIf { browser || loopback }
+        if (!isDiscordRedirectUrl(url, APPLICATION_ID)) return null
+        return Uri.parse(url)
     }
 
     private fun requestTokens(body: FormBody): DiscordTokens {
@@ -387,6 +363,15 @@ object DiscordAuthManager {
     internal fun sha256Challenge(verifier: String): String = MessageDigest.getInstance("SHA-256")
         .digest(verifier.toByteArray(Charsets.US_ASCII))
         .let { Base64.encodeToString(it, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING) }
+}
+
+internal fun isDiscordRedirectUrl(url: String, applicationId: String): Boolean {
+    val uri = runCatching { URI(url) }.getOrNull() ?: return false
+    val answered = uri.rawQuery.orEmpty().split('&').any { parameter ->
+        parameter.substringBefore('=') == "code" || parameter.substringBefore('=') == "error"
+    }
+    return answered && uri.scheme.equals("discord-$applicationId", ignoreCase = true) &&
+        uri.path == "/authorize/callback"
 }
 
 @Serializable
