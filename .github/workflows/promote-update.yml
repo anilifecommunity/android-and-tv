@@ -30,6 +30,11 @@ on:
         required: true
         default: "365"
         type: string
+      web_index_only:
+        description: Republish the existing signed stable event to the web index without notifying apps
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -50,6 +55,7 @@ jobs:
       UPDATE_CHANNEL: ${{ inputs.channel }}
       IMPORTANT: ${{ inputs.important }}
       EXPIRES_IN_DAYS: ${{ inputs.expires_in_days }}
+      WEB_INDEX_ONLY: ${{ inputs.web_index_only }}
       ANDROID_SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
     steps:
       - name: Check out publisher
@@ -79,6 +85,9 @@ jobs:
           else
             test "$(jq -r '.prerelease' <<<"$release_json")" = "false"
             [[ "$RELEASE_TAG" != *-* ]]
+          fi
+          if [[ "$WEB_INDEX_ONLY" = true ]]; then
+            test "$UPDATE_CHANNEL" = stable
           fi
           mkdir release
           gh release download "$RELEASE_TAG" --dir release
@@ -121,6 +130,7 @@ jobs:
           gh release view "$RELEASE_TAG" --json body --jq .body > release-notes.txt
 
       - name: Sign canonical update manifest
+        if: ${{ !inputs.web_index_only }}
         shell: bash
         env:
           NOSTR_UPDATE_SECRET: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY }}
@@ -154,7 +164,22 @@ jobs:
             (.content | fromjson | .schema == 1)
           ' update.json >/dev/null
 
+      - name: Verify existing signed update manifest
+        if: ${{ inputs.web_index_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --require-hashes \
+            -r scripts/update-requirements.txt
+          cp release/update.json update.json
+          python -c 'import json, sys; sys.path.insert(0, "scripts"); from nostr_update import verify_event; assert verify_event(json.load(open("update.json", encoding="utf-8")))'
+          jq -e '
+            .pubkey == "dc30dfa5ab26f3fa076dd6ce0cdade53fa47e7db6a750908a954084afb06b46c" and
+            (.content | fromjson | .schema == 1)
+          ' update.json >/dev/null
+
       - name: Mirror and broadcast the signed event
+        if: ${{ !inputs.web_index_only }}
         shell: bash
         run: |
           set -euo pipefail
