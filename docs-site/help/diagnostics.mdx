@@ -10,7 +10,7 @@ keywords:
   - "export logs"
 ---
 
-Anilife keeps diagnostics on the device by default. Create a report when a reproducible problem needs logs, device information, playback timing, or provider request details.
+Anilife records redacted diagnostics locally. On official builds, a one-time privacy notice appears before automatic upload can be scheduled. You can turn automatic uploads off at any time in **Settings → App**.
 
 ## Export a report
 
@@ -39,10 +39,11 @@ Open **Settings → App → Diagnostic detail**:
 
 Changing detail does not enable uploads. Reports identify the active detail mode and include sampled or dropped-event counters so maintainers can tell when a trace is incomplete.
 
-## Optional uploads
+## Uploads
 
 - **Upload diagnostics now** sends one redacted report to the private Anilife diagnostics service.
-- **Automatically upload diagnostics** is off by default. When enabled, it starts a new consent window and schedules at most one report per day.
+- **Automatically upload diagnostics** sends at most one report per day. It is enabled after the one-time notice only when you have not already made a choice.
+- The first automatic report contains only events recorded after automatic upload was enabled. Nothing is scheduled before you acknowledge the notice.
 - Accepted uploads are private and retained for 30 days.
 
-Turning automatic upload off cancels queued work and removes staged reports. Local export remains available without enabling uploads.
+Turning automatic upload off cancels queued work and removes staged reports. An existing explicit on or off choice is preserved when you update Anilife. Local export remains available without enabling uploads.
