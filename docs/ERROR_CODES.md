@@ -157,6 +157,7 @@ error number, kept because it is more precise than anything this app invents:
 | `UPD-04` | Couldn't make room for the update. | Free up space |
 | `UPD-05` | This device refused to install the update. | &mdash; |
 | `UPD-06` | No installer on this device accepted the update. | &mdash; |
+| `UPD-07` | This installation can't receive official updates. | &mdash; |
 
 ## Diagnostics: `DIAG`
 

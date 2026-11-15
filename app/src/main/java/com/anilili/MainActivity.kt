@@ -159,6 +159,7 @@ import com.anilili.data.settings.SettingsStore
 import com.anilili.data.update.UpdateManager
 import com.anilili.diagnostics.CrashReportDialog
 import com.anilili.diagnostics.CrashReporter
+import com.anilili.diagnostics.DiagnosticsDisclosureHost
 import com.anilili.diagnostics.DiagnosticsJankMonitor
 import com.anilili.diagnostics.DiagnosticsLog
 import com.anilili.diagnostics.chromiumRestartIsFatal
@@ -354,6 +355,7 @@ class MainActivity : FragmentActivity() {
                             AllAnimeCaptchaHost()
                             CloudflareChallengeHost()
                             AnnouncementHost()
+                            DiagnosticsDisclosureHost()
                             var crashReport by remember { mutableStateOf(CrashReporter.pendingReport()) }
                             crashReport?.let { report ->
                                 CrashReportDialog(

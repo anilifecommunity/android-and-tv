@@ -58,6 +58,20 @@ class DiagnosticsUploadPolicyTest {
     }
 
     @Test
+    fun `configured builds enable diagnostics only when the viewer has not already chosen`() {
+        assertTrue(diagnosticsShouldEnableByDefault(hasStoredChoice = false, originAvailable = true))
+        assertFalse(diagnosticsShouldEnableByDefault(hasStoredChoice = true, originAvailable = true))
+        assertFalse(diagnosticsShouldEnableByDefault(hasStoredChoice = false, originAvailable = false))
+    }
+
+    @Test
+    fun `automatic upload stays blocked until the default notice is acknowledged`() {
+        assertFalse(diagnosticsAutomaticUploadAllowed(enabled = true, noticePending = true))
+        assertTrue(diagnosticsAutomaticUploadAllowed(enabled = true, noticePending = false))
+        assertFalse(diagnosticsAutomaticUploadAllowed(enabled = false, noticePending = false))
+    }
+
+    @Test
     fun `ambiguous success retries while permanent rejection drops the staged report`() {
         assertEquals(DiagnosticsReceiptDecision.ACCEPT, diagnosticsReceiptDecision(202, true))
         assertEquals(DiagnosticsReceiptDecision.RETRY, diagnosticsReceiptDecision(202, false))

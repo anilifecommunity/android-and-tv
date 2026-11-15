@@ -3226,7 +3226,7 @@ fun SettingsScreen(
                 item(key = "Automatically upload diagnostics") {
                     MidnightSettingSwitchRow(
                         title = "Automatically upload diagnostics",
-                        description = "Off by default · daily redacted reports after opt-in · private 30-day retention",
+                        description = "Daily redacted reports · private 30-day retention · turn off anytime",
                         checked = automaticDiagnostics,
                         onCheckedChange = { DiagnosticsUploadManager.setAutomatic(context, it) },
                     )

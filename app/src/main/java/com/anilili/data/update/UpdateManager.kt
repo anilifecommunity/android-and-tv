@@ -532,8 +532,18 @@ object UpdateManager {
             if (actual != expected.toLong()) error("Downloaded APK build does not match the manifest")
         }
         if (candidate.versionName != info.version) error("Downloaded APK version does not match the manifest")
-        if (!signersMatch(installed.signerBytes(installed = true), candidate.signerBytes(installed = false))) {
-            error("Downloaded APK signer does not match the installed app")
+        val installedSigners = installed.signerBytes(installed = true)
+        val candidateSigners = candidate.signerBytes(installed = false)
+        if (!signersMatch(installedSigners, candidateSigners)) {
+            AnililiError.UPDATE_SIGNATURE_MISMATCH.raise(
+                detail = "This installed APK was signed with a different certificate than the official update. " +
+                    "Back up anything you need, uninstall Anilife, then install the latest APK from " +
+                    "https://anilife.cc/downloads.",
+                attributes = mapOf(
+                    "installedSignerSha256" to signerDigests(installedSigners).joinToString(","),
+                    "candidateSignerSha256" to signerDigests(candidateSigners).joinToString(","),
+                ),
+            )
         }
     }
 
@@ -602,9 +612,12 @@ internal fun acceptsManifestSequence(sequence: Long?, lastAccepted: Long): Boole
 
 internal fun signersMatch(installed: List<ByteArray>, candidate: List<ByteArray>): Boolean {
     if (installed.isEmpty() || candidate.isEmpty()) return false
-    fun ByteArray.digest() = MessageDigest.getInstance("SHA-256").digest(this).toHexString()
-    val trusted = installed.map(ByteArray::digest).toSet()
-    return candidate.map(ByteArray::digest).any(trusted::contains)
+    val trusted = signerDigests(installed).toSet()
+    return signerDigests(candidate).any(trusted::contains)
+}
+
+internal fun signerDigests(signers: List<ByteArray>): List<String> = signers.map {
+    MessageDigest.getInstance("SHA-256").digest(it).toHexString()
 }
 
 internal fun newestUpdate(updates: List<UpdateManager.UpdateInfo>): UpdateManager.UpdateInfo? =

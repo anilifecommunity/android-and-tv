@@ -64,6 +64,12 @@ internal fun nextLocalMidnightDelayMillis(now: ZonedDateTime): Long = Duration.b
 internal fun diagnosticsUploadShouldCatchUp(lastSuccessfulDate: String?, today: LocalDate): Boolean =
     lastSuccessfulDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }?.isBefore(today) == true
 
+internal fun diagnosticsShouldEnableByDefault(hasStoredChoice: Boolean, originAvailable: Boolean): Boolean =
+    !hasStoredChoice && originAvailable
+
+internal fun diagnosticsAutomaticUploadAllowed(enabled: Boolean, noticePending: Boolean): Boolean =
+    enabled && !noticePending
+
 internal enum class DiagnosticsReceiptDecision { ACCEPT, RETRY, DROP }
 
 internal fun diagnosticsReceiptDecision(status: Int, receiptValid: Boolean): DiagnosticsReceiptDecision = when {
@@ -95,6 +101,7 @@ private enum class UploadOutcome { SUCCESS, RETRY }
 object DiagnosticsUploadManager {
     private const val PREFS = "anilili_diagnostics_upload"
     private const val KEY_ENABLED = "automatic_enabled"
+    private const val KEY_DEFAULT_NOTICE_PENDING = "default_notice_pending"
     private const val KEY_CONSENT_VERSION = "consent_version"
     private const val KEY_WATERMARK = "capture_watermark_utc"
     private const val KEY_PENDING_ID = "pending_report_id"
@@ -114,16 +121,28 @@ object DiagnosticsUploadManager {
     ).withZone(ZoneOffset.UTC)
     private val _automatic = MutableStateFlow(false)
     val automatic = _automatic.asStateFlow()
+    private val _defaultNoticePending = MutableStateFlow(false)
+    val defaultNoticePending = _defaultNoticePending.asStateFlow()
     private val _status = MutableStateFlow<String?>(null)
     val status = _status.asStateFlow()
 
     fun init(context: Context) {
         val app = context.applicationContext
         val preferences = preferences(app)
+        if (diagnosticsShouldEnableByDefault(preferences.contains(KEY_ENABLED), origin() != null)) {
+            preferences.edit()
+                .putBoolean(KEY_ENABLED, true)
+                .putBoolean(KEY_DEFAULT_NOTICE_PENDING, true)
+                .putInt(KEY_CONSENT_VERSION, CONSENT_VERSION)
+                .putString(KEY_WATERMARK, nowUtc())
+                .putString(KEY_LAST_SUCCESSFUL_DATE, LocalDate.now().toString())
+                .commit()
+        }
         _automatic.value = preferences.getBoolean(KEY_ENABLED, false)
+        _defaultNoticePending.value = preferences.getBoolean(KEY_DEFAULT_NOTICE_PENDING, false)
         _status.value = preferences.getString(KEY_LAST_STATUS, null)
         cleanupOrphanedStaging(app, preferences.getString(KEY_PENDING_ID, null))
-        if (_automatic.value && origin() != null) {
+        if (_automatic.value && !_defaultNoticePending.value && origin() != null) {
             scheduleNext(
                 app,
                 immediate = diagnosticsUploadShouldCatchUp(
@@ -146,28 +165,41 @@ object DiagnosticsUploadManager {
         if (enabled && !wasEnabled) {
             preferences.edit()
                 .putBoolean(KEY_ENABLED, true)
+                .putBoolean(KEY_DEFAULT_NOTICE_PENDING, false)
                 .putInt(KEY_CONSENT_VERSION, CONSENT_VERSION)
                 .putString(KEY_WATERMARK, nowUtc())
                 .putString(KEY_LAST_SUCCESSFUL_DATE, LocalDate.now().toString())
                 .commit()
             _automatic.value = true
+            _defaultNoticePending.value = false
             setStatus(app, "Automatic diagnostics enabled; only new events can be uploaded")
             scheduleNext(app)
             DiagnosticsLog.event("diagnostics", "automatic_upload.enabled")
         } else if (!enabled) {
             preferences.edit()
                 .putBoolean(KEY_ENABLED, false)
+                .putBoolean(KEY_DEFAULT_NOTICE_PENDING, false)
                 .remove(KEY_PENDING_ID)
                 .remove(KEY_PENDING_END)
                 .remove(KEY_PENDING_TRIGGER)
                 .commit()
             _automatic.value = false
+            _defaultNoticePending.value = false
             activeUpload?.takeIf(ActiveUpload::automatic)?.call?.cancel()
             WorkManager.getInstance(app).cancelUniqueWork(WORK_NAME)
             stagingDirectory(app).deleteRecursively()
             setStatus(app, "Automatic diagnostics disabled; queued uploads deleted")
             DiagnosticsLog.event("diagnostics", "automatic_upload.disabled")
         }
+    }
+
+    fun acknowledgeDefaultNotice(context: Context) {
+        if (!_defaultNoticePending.value) return
+        val app = context.applicationContext
+        preferences(app).edit().putBoolean(KEY_DEFAULT_NOTICE_PENDING, false).commit()
+        _defaultNoticePending.value = false
+        if (_automatic.value) scheduleNext(app)
+        DiagnosticsLog.event("diagnostics", "automatic_upload.disclosed")
     }
 
     suspend fun uploadNow(context: Context): String = withContext(Dispatchers.IO) {
@@ -178,9 +210,16 @@ object DiagnosticsUploadManager {
         }
     }
 
-    internal suspend fun performAutomatic(context: Context): Boolean =
-        performUpload(context.applicationContext, DiagnosticTrigger.DAILY, automaticOnly = true) ==
-            UploadOutcome.SUCCESS
+    internal suspend fun performAutomatic(context: Context): Boolean {
+        val app = context.applicationContext
+        val preferences = preferences(app)
+        if (!diagnosticsAutomaticUploadAllowed(
+                preferences.getBoolean(KEY_ENABLED, false),
+                preferences.getBoolean(KEY_DEFAULT_NOTICE_PENDING, false),
+            )
+        ) return true
+        return performUpload(app, DiagnosticTrigger.DAILY, automaticOnly = true) == UploadOutcome.SUCCESS
+    }
 
     internal fun scheduleNext(
         context: Context,
@@ -188,7 +227,13 @@ object DiagnosticsUploadManager {
         immediate: Boolean = false,
     ) {
         val app = context.applicationContext
-        if (!preferences(app).getBoolean(KEY_ENABLED, false) || origin() == null) return
+        val preferences = preferences(app)
+        if (!diagnosticsAutomaticUploadAllowed(
+                preferences.getBoolean(KEY_ENABLED, false),
+                preferences.getBoolean(KEY_DEFAULT_NOTICE_PENDING, false),
+            ) ||
+            origin() == null
+        ) return
         val request = OneTimeWorkRequestBuilder<DiagnosticsUploadWorker>()
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setInitialDelay(if (immediate) 0L else nextLocalMidnightDelayMillis(now), TimeUnit.MILLISECONDS)
