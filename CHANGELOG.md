@@ -5,13 +5,21 @@ stays marked **Unreleased** until its GitHub release is published.
 
 ## [Unreleased]
 
-## [0.1.3] - 2026-11-14
+## [0.1.3] - 2026-11-15
+
+### Changed
+
+- Enabled private, redacted Standard diagnostics by default after a one-time disclosure so release
+  issues can be diagnosed sooner; existing choices remain respected and uploads can be disabled
+  anytime in Settings.
 
 ### Fixed
 
 - Replaced the incompatible confidential MyAnimeList Web client with a public Android client and
   sent its exact registered redirect during authorization and token exchange, restoring MAL sign-in
   on phones and televisions without embedding a client secret.
+- Signer-mismatched installations now explain that they need one backup/uninstall/reinstall instead
+  of misreporting a completed APK download as a retryable download failure.
 
 ## [0.1.2] - 2026-11-14
 

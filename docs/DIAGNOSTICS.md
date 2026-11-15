@@ -1,8 +1,11 @@
 # Diagnostics and privacy
 
-Diagnostic collection is local by default. A report leaves the device only when the user exports
-or uploads one manually, approves the crash-report prompt, or explicitly enables the separate
-**Automatically upload diagnostics** setting. That setting is off by default.
+Diagnostic collection is local until the one-time privacy notice is acknowledged. On configured
+official builds, **Automatically upload diagnostics** then sends one private, redacted report per
+day to help identify failures. Diagnostic detail remains Standard by default unless the user has
+chosen Enhanced. The notice appears before the first report can be scheduled, and the setting can
+be turned off at any time. Existing explicit choices are preserved. A report can also leave the
+device when the user exports or uploads one manually or approves the crash-report prompt.
 
 **Diagnostic detail** is independent from upload consent and persists until changed:
 
@@ -16,7 +19,8 @@ operation, trace and span correlation. Reports include persisted, sampled and qu
 so missing detail is explicit rather than silently presented as a complete trace. Version 1 event
 lines remain readable with Standard defaults.
 
-Enabling automatic upload starts a new consent window: events recorded before consent are excluded.
+Default activation or manually enabling automatic upload starts a new collection window: events
+recorded before that point are excluded.
 The app schedules at most one daily report, retains a staged report unchanged across safe retries,
 and accepts success only when the service returns the same report ID. Turning the setting off
 cancels queued work and removes staged reports. Accepted uploads are private and expire after 30

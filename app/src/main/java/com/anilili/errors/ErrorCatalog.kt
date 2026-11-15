@@ -435,6 +435,7 @@ enum class AnililiError(
     UPDATE_STORAGE_FAILED(ErrorDomain.UPDATE, 4, "Couldn't make room for the update.", ErrorAction.FREE_SPACE),
     UPDATE_INSTALL_REFUSED(ErrorDomain.UPDATE, 5, "This device refused to install the update."),
     UPDATE_INSTALLER_MISSING(ErrorDomain.UPDATE, 6, "No installer on this device accepted the update."),
+    UPDATE_SIGNATURE_MISMATCH(ErrorDomain.UPDATE, 7, "This installation can't receive official updates."),
 
     // ---------------------------------------------------------------- DIAG
     DIAGNOSTICS_BUNDLE_FAILED(ErrorDomain.DIAGNOSTICS, 1, "Couldn't prepare the diagnostics report.", ErrorAction.RETRY, retryable = true),
