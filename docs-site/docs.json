@@ -49,6 +49,10 @@
         "href": "https://anilife.cc"
       },
       {
+        "href": "https://discord.gg/7yYZHsqadd",
+        "type": "discord"
+      },
+      {
         "type": "github",
         "href": "https://github.com/anilifecommunity/android-and-tv"
       }
@@ -62,7 +66,8 @@
   "footer": {
     "socials": {
       "website": "https://anilife.cc",
-      "github": "https://github.com/anilifecommunity"
+      "github": "https://github.com/anilifecommunity",
+      "discord": "https://discord.gg/7yYZHsqadd"
     },
     "links": [
       {
@@ -75,6 +80,19 @@
           {
             "label": "Android and TV releases",
             "href": "https://github.com/anilifecommunity/android-and-tv/releases"
+          }
+        ]
+      },
+      {
+        "header": "Community",
+        "items": [
+          {
+            "label": "Join Discord",
+            "href": "https://discord.gg/7yYZHsqadd"
+          },
+          {
+            "label": "View source on GitHub",
+            "href": "https://github.com/anilifecommunity/android-and-tv"
           }
         ]
       },
