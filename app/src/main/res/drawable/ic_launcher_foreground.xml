@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 13+ themed-icon mask, derived from the canonical transparent Anilife mark. -->
-<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
-    android:gravity="fill"
-    android:src="@drawable/anilili_launcher"
-    android:tint="#FFFFFFFF" />
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="10%">
+    <bitmap
+        android:gravity="fill"
+        android:src="@drawable/anilili_launcher"
+        android:tint="#FFFFFFFF" />
+</inset>
