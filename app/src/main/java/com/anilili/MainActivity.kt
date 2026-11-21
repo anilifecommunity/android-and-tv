@@ -732,6 +732,7 @@ internal enum class Tab(
  */
 internal val phoneTabs = listOf(Tab.HOME, Tab.SEARCH, Tab.DOWNLOADS, Tab.MORE, Tab.SETTINGS)
 internal val cinemaTabs = listOf(Tab.HOME, Tab.MORE, Tab.SEARCH, Tab.SCHEDULE, Tab.SETTINGS)
+internal val cinemaPhoneTabs = listOf(Tab.HOME, Tab.MORE, Tab.SEARCH, Tab.DOWNLOADS, Tab.SETTINGS)
 
 internal fun Tab.navigationLabel(language: MenuLanguage, cinema: Boolean): String = when {
     !cinema -> label(language)
@@ -777,7 +778,7 @@ private fun MiruroRoot(
     val menuLanguage by SettingsStore.menuLanguage.collectAsState()
     val appLayoutMode by SettingsStore.appLayoutMode.collectAsState()
     val cinema = appLayoutMode == AppLayoutMode.CINEMA
-    val navigationTabs = if (cinema) cinemaTabs else phoneTabs
+    val navigationTabs = if (cinema) cinemaPhoneTabs else phoneTabs
     val railTabs = if (cinema) cinemaTabs else Tab.entries
     var chromeVisible by remember { mutableStateOf(true) }
     val tvSearchRailFocusRequester = remember { FocusRequester() }
