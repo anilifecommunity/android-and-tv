@@ -84,6 +84,7 @@ object CustomListStore {
             lists = listOf(CustomList(name, createdAt = System.currentTimeMillis())) + _lists.value,
             ops = ops.created(name),
         )
+        SettingsStore.renameHiddenLibraryList(listKey(name))
         DiagnosticsLog.event("Custom list created")
         return name
     }
@@ -103,6 +104,7 @@ object CustomListStore {
             lists = _lists.value.map { if (it === current) it.copy(name = to) else it },
             ops = next,
         )
+        SettingsStore.renameHiddenLibraryList(listKey(current.name), listKey(to))
         DiagnosticsLog.event("Custom list renamed titles=${current.entries.size}")
         return to
     }
@@ -111,6 +113,7 @@ object CustomListStore {
     fun delete(name: String) {
         val current = list(name) ?: return
         update(lists = _lists.value - current, ops = ops.deleted(current.name))
+        SettingsStore.renameHiddenLibraryList(listKey(current.name))
         DiagnosticsLog.event("Custom list deleted titles=${current.entries.size}")
     }
 

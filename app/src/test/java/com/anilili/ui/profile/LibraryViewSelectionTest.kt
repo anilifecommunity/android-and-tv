@@ -52,6 +52,16 @@ class LibraryViewSelectionTest {
     }
 
     @Test
+    fun `signing out only filters availability and never rewrites the saved choice`() {
+        val saved = "WATCHING,DROPPED"
+        assertEquals(SIGNED_OUT, libraryViewsFrom(saved, SIGNED_OUT))
+        assertEquals(listOf(LibraryView.WATCHING, LibraryView.DROPPED), libraryViewsFrom(saved, ALL))
+        assertEquals(emptyList<LibraryView>(), libraryViewsFrom("", SIGNED_OUT))
+        assertEquals(emptyList<LibraryView>(), libraryViewsFrom("", ALL))
+        assertEquals("WATCHLIST,COMPLETED", defaultLibraryViewNames(loggedIn = false))
+    }
+
+    @Test
     fun `a name from an older build is ignored rather than crashing the page`() {
         // Saved state outlives a rename, and valueOf on the missing name would have thrown.
         assertEquals(

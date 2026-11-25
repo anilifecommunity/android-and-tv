@@ -73,6 +73,15 @@ class SettingsBackupKeyTest {
     }
 
     @Test
+    fun `library visibility layout migration and fixed skip controls travel in backups`() {
+        val backedUp = SettingsStore.backupKeys.map { it.name }.toSet()
+        assertTrue(backedUp.containsAll(setOf(
+            "app_layout_mode", "app_layout_migration_version", "library_view_names",
+            "hidden_library_custom_list_keys", "show_skip_button", "skip_button_seconds",
+        )))
+    }
+
+    @Test
     fun `the mirror this device found is never carried to another one`() {
         val backedUp = SettingsStore.backupKeys.map { it.name }
         assertTrue("last_pipe_origin" !in backedUp)

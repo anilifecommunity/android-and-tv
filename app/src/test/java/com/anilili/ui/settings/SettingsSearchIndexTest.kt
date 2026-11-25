@@ -37,6 +37,13 @@ class SettingsSearchIndexTest {
     }
 
     @Test
+    fun `fixed jump visibility can be found without knowing the setting title`() {
+        for (query in listOf("fixed jump", "hide skip", "85")) {
+            assertTrue(query, searchSettings(query, entries).any { it.title == "Skip button" })
+        }
+    }
+
+    @Test
     fun `a name match outranks a keyword match`() {
         // "Skip button" and "Skip button length" are named for it; auto-skip only mentions it.
         val titles = searchSettings("skip button", entries).map { it.title }
