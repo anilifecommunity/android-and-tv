@@ -3,10 +3,10 @@
 Use an existing issue or open a focused proposal before changing application identity, security
 boundaries, providers, update trust, or release behaviour. Small fixes can use the bug template.
 
-By submitting a contribution, you confirm that you have the right to do so and grant the rights
-described in section 4 of the [Anilife Source-Available License 1.0](LICENSE). A public fork may be
-used to prepare a pull request, but it must not publish builds, releases, hosted copies, or an
-independent distribution of Anilife.
+By submitting a contribution to the 2.0.0 development source, you confirm that you have the right
+to contribute it under [GNU GPL version 3](LICENSE) (`GPL-3.0-only`). Preserve applicable copyright
+and third-party licence notices. Redistribution must meet the GPL, including corresponding-source
+requirements for binaries. These terms do not replace the licences of earlier releases.
 
 ## Development setup
 

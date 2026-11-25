@@ -104,10 +104,10 @@ and the [post-candidate milestone](https://github.com/anilifecommunity/android-a
 
 ## Licence and content boundary
 
-Anilife is source-available under the [Anilife Source-Available License 1.0](LICENSE). Personal,
-non-commercial use and contribution forks are permitted; redistribution, sale, commercial use,
-independent releases, and hosted copies are not. This is not an OSI-approved open-source licence.
-Earlier commits and releases keep the licence under which they were originally published.
+The Anilife 2.0.0 development source is licensed under [GNU GPL version 3](LICENSE)
+(`GPL-3.0-only`). You may use, modify and redistribute it under those terms, including providing
+the corresponding source when distributing binaries. Earlier commits and releases retain the
+licence under which they were published; this does not change the terms of the existing 0.1.x APKs.
 
 Third-party anime, artwork, subtitles, streams, libraries, trademarks, and provider APIs remain
 under their own terms. The repository licence grants no rights to that material.
