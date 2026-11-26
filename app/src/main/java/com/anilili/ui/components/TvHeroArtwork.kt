@@ -1,6 +1,7 @@
 package com.anilili.ui.components
 
 import com.anilili.ui.theme.appCanvas
+import com.anilili.ui.adaptive.LocalAppDeviceProfile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -147,32 +148,35 @@ fun TvHeroArtwork(
     wideArtwork: String? = media.wideHeroArtwork(),
 ) {
     val cover = media.coverImage.best
+    val lowCost = LocalAppDeviceProfile.current.useLowCostTvEffects
 
     Box(modifier.clipToBounds().appCanvas()) {
         if (wideArtwork != null) {
             HeroPicture(wideArtwork, Modifier.fillMaxSize())
         } else if (cover != null) {
-            val context = LocalContext.current
-            val ambientRequest = remember(cover) {
-                ImageRequest.Builder(context)
-                    .data(cover)
-                    .size(320, 480)
-                    .crossfade(false)
-                    .build()
+            if (!lowCost) {
+                val context = LocalContext.current
+                val ambientRequest = remember(cover) {
+                    ImageRequest.Builder(context)
+                        .data(cover)
+                        .size(320, 480)
+                        .crossfade(false)
+                        .build()
+                }
+                AsyncImage(
+                    model = ambientRequest,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            scaleX = 1.16f
+                            scaleY = 1.16f
+                        }
+                        .blur(34.dp),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.30f)))
             }
-            AsyncImage(
-                model = ambientRequest,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        scaleX = 1.16f
-                        scaleY = 1.16f
-                    }
-                    .blur(34.dp),
-                contentScale = ContentScale.Crop,
-            )
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.30f)))
             AsyncImage(
                 model = cover,
                 contentDescription = null,

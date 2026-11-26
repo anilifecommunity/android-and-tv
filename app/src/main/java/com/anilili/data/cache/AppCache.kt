@@ -1,9 +1,9 @@
 package com.anilili.data.cache
 
-import android.app.ActivityManager
 import android.content.Context
 import android.system.Os
 import com.anilili.data.AppGraph
+import com.anilili.data.device.hasConservativeMemoryBudget
 import com.anilili.diagnostics.DiagnosticsLog
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -46,12 +46,11 @@ class AppCache(
     private val diskDirectory = File(appContext.filesDir, CACHE_DIRECTORY).apply { mkdirs() }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val keyLocks = Array(64) { Mutex() }
-    private val isLowRamDevice =
-        (appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).isLowRamDevice
-    private val memoryEntryLimit = if (AppGraph.isTv || isLowRamDevice) 40 else MEMORY_ENTRIES
+    private val conservativeMemory = hasConservativeMemoryBudget(appContext)
+    private val memoryEntryLimit = if (AppGraph.isTv || conservativeMemory) 40 else MEMORY_ENTRIES
     private val memoryByteLimit =
-        if (AppGraph.isTv || isLowRamDevice) LOW_MEMORY_BYTES else MEMORY_BYTES
-    private val diskEntryLimit = if (isLowRamDevice) LOW_RAM_DISK_ENTRIES else DISK_ENTRIES
+        if (AppGraph.isTv || conservativeMemory) LOW_MEMORY_BYTES else MEMORY_BYTES
+    private val diskEntryLimit = if (conservativeMemory) LOW_RAM_DISK_ENTRIES else DISK_ENTRIES
     private val memory = LinkedHashMap<String, CacheEntry>(memoryEntryLimit, 0.75f, true)
     private var memoryBytes = 0L
     private val pendingTouches = LinkedHashMap<String, Long>()
@@ -60,7 +59,7 @@ class AppCache(
     init {
         DiagnosticsLog.event(
             "AppCache file store memoryEntries=$memoryEntryLimit memoryBytes=$memoryByteLimit " +
-                "diskEntries=$diskEntryLimit lowRam=$isLowRamDevice tv=${AppGraph.isTv}",
+                "diskEntries=$diskEntryLimit conservativeMemory=$conservativeMemory tv=${AppGraph.isTv}",
         )
         // The old database contains only re-fetchable network data. Delete it off the main thread
         // after switching backends so Room and CursorWindow can no longer enter this cache path.

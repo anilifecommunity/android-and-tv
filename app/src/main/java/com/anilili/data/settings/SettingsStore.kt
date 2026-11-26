@@ -17,6 +17,8 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.anilili.data.AppGraph
 import com.anilili.data.device.isTelevision
+import com.anilili.data.device.hasConservativeMemoryBudget
+import com.anilili.data.device.effectiveBackdropBlur
 import com.anilili.diagnostics.CrashReporter
 import java.io.IOException
 import java.io.File
@@ -719,6 +721,7 @@ object SettingsStore {
 
     /** Held only to re-ask the television question once the persisted half of it has been read. */
     @Volatile private var appContext: Context? = null
+    private var conservativeMemory = true
 
     private val _autoplay = MutableStateFlow(true)
     val autoplay = _autoplay.asStateFlow()
@@ -1320,6 +1323,7 @@ object SettingsStore {
     fun init(context: Context) {
         val app = context.applicationContext
         appContext = app
+        conservativeMemory = hasConservativeMemoryBudget(app)
         store = PreferenceDataStoreFactory.create(
             scope = scope,
             produceFile = { app.preferencesDataStoreFile("anilili_settings") },
@@ -1677,7 +1681,7 @@ object SettingsStore {
                         prefs[APP_BACKDROP_IMAGE],
                     ),
                     dim = AppBackdropDim.fromStored(prefs[APP_BACKDROP_DIM]).alpha,
-                    blur = prefs[APP_BACKDROP_BLUR] ?: true,
+                    blur = effectiveBackdropBlur(prefs[APP_BACKDROP_BLUR], AppGraph.isTv, conservativeMemory),
                 )
             }
     }
@@ -2189,7 +2193,6 @@ object SettingsStore {
         _appBackdropAnimeTitle.value = prefs[APP_BACKDROP_ANIME_TITLE]
         _appBackdropImage.value = prefs[APP_BACKDROP_IMAGE]
         _appBackdropDim.value = AppBackdropDim.fromStored(prefs[APP_BACKDROP_DIM])
-        _appBackdropBlur.value = prefs[APP_BACKDROP_BLUR] ?: true
         _formFactorPreference.value = FormFactorPreference.fromStored(prefs[FORM_FACTOR_PREFERENCE])
         _appLayoutMode.value = if ((prefs[APP_LAYOUT_MIGRATION_VERSION] ?: 0) >= 1) {
             AppLayoutMode.fromStored(prefs[APP_LAYOUT_MODE])
@@ -2200,6 +2203,7 @@ object SettingsStore {
         // Both of the above feed AppGraph.isTv, which was seeded from the device's signals alone on
         // the startup path — this file had not been read yet. Now it has.
         appContext?.let { AppGraph.refreshIsTv(isTelevision(it)) }
+        _appBackdropBlur.value = effectiveBackdropBlur(prefs[APP_BACKDROP_BLUR], AppGraph.isTv, conservativeMemory)
         _downloadQuality.value = DownloadQuality.fromStored(prefs[DOWNLOAD_QUALITY])
         _downloadDestination.value = DownloadDestination.fromStored(prefs[DOWNLOAD_DESTINATION])
         _downloadHardSubsOnly.value = prefs[DOWNLOAD_HARD_SUBS_ONLY] ?: false

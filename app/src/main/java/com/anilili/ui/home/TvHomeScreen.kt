@@ -1019,19 +1019,13 @@ internal fun TvRailScrollSpec(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec, content = content)
 }
 
-/**
- * Cards a rail builds ahead while it is still below the screen. Compose's default is two, so the
- * rail scrolling into view built the other four or five in the middle of the page's scroll, and
- * the glide stopped short of centre for those frames and then jumped the rest of the way. Seven
- * is a screen's width of portrait cards.
- */
-private const val TV_RAIL_PREFETCH_CARDS = 7
-
-/** A TV rail's LazyRow state, built a screen's width ahead so scrolling down to it does not stall. */
+/** Constrained devices precompose one card; larger devices retain the full-width rail prefetch. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun rememberTvRailState(): LazyListState =
-    rememberLazyListState(prefetchStrategy = remember { LazyListPrefetchStrategy(TV_RAIL_PREFETCH_CARDS) })
+internal fun rememberTvRailState(): LazyListState {
+    val cards = LocalAppDeviceProfile.current.tvRailPrefetchCards
+    return rememberLazyListState(prefetchStrategy = remember(cards) { LazyListPrefetchStrategy(cards) })
+}
 
 /** TV catalog rails use AniList's portrait cover; wide artwork is reserved for the hero. */
 internal fun tvMediaCardArtwork(media: Media): String? = media.coverImage.best
