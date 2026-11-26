@@ -19,6 +19,8 @@ import com.anilili.data.AppGraph
 import com.anilili.data.device.isTelevision
 import com.anilili.diagnostics.CrashReporter
 import java.io.IOException
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 import com.anilili.data.model.WatchedFilter
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +37,7 @@ import kotlinx.coroutines.withContext
 import com.anilili.diagnostics.DiagnosticsLog
 import okio.buffer
 import okio.source
+import okio.sink
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -1741,6 +1744,32 @@ object SettingsStore {
                 it[APP_LAYOUT_MODE] = value.storedValue
                 it[APP_LAYOUT_MIGRATION_VERSION] = 1
             }
+        }
+    }
+
+    internal suspend fun copySettingsForNewProfile(from: File, to: File) = withContext(Dispatchers.IO) {
+        require(from.canonicalFile != to.canonicalFile && !to.exists()) { "New profile settings must have a new destination" }
+        val inherited = from.source().buffer().use {
+            androidx.datastore.preferences.core.PreferencesSerializer.readFrom(it)
+        }.toMutablePreferences()
+        inherited -= APP_LAYOUT_MODE
+        inherited -= APP_LAYOUT_MIGRATION_VERSION
+        inherited -= LIBRARY_VIEW_NAMES
+        inherited -= HIDDEN_LIBRARY_CUSTOM_LIST_KEYS
+        migrateLayoutPreferences(inherited)
+        to.parentFile?.mkdirs()
+        val staged = File(to.parentFile, "${to.name}.new-profile")
+        try {
+            FileOutputStream(staged).use { stream ->
+                stream.sink().buffer().use { sink ->
+                    androidx.datastore.preferences.core.PreferencesSerializer.writeTo(inherited, sink)
+                    sink.flush()
+                    stream.fd.sync()
+                }
+            }
+            if (!staged.renameTo(to)) throw IOException("New profile settings could not be committed")
+        } finally {
+            staged.delete()
         }
     }
 

@@ -5,9 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Process
+import androidx.datastore.core.CorruptionException
 import com.anilili.data.auth.SecureTokenStore
 import com.anilili.data.library.WatchNextManager
 import com.anilili.data.remote.ListProgressSyncWorker
+import com.anilili.data.settings.SettingsStore
 import com.anilili.diagnostics.DiagnosticsLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -154,10 +157,15 @@ object Profiles {
             val saved = File(incoming, live.name)
             when {
                 saved.exists() -> move(saved, live)
-                // A profile that has never been active starts with the settings the TV already
-                // has rather than factory defaults: the person adding it was looking at them.
+                // Inherit the TV's appearance/player preferences, with fresh layout/tab ownership.
                 live.name == SETTINGS_FILE -> File(outgoing, live.name).takeIf(File::exists)
-                    ?.copyTo(live.apply { parentFile?.mkdirs() }, overwrite = true)
+                    ?.let { source ->
+                        try {
+                            runBlocking(Dispatchers.IO) { SettingsStore.copySettingsForNewProfile(source, live) }
+                        } catch (error: CorruptionException) {
+                            DiagnosticsLog.throwable("New profile starts with defaults: inherited settings unreadable", error)
+                        }
+                    }
             }
         }
         outgoingSettingsFile = File(outgoing, SETTINGS_FILE)

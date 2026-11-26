@@ -1,10 +1,13 @@
 package com.anilili.data.settings
 
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.core.CorruptionException
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.PreferencesSerializer
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,6 +18,12 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import okio.buffer
+import okio.sink
+import okio.source
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -89,5 +98,41 @@ class LibraryPreferencesTest {
         assertEquals("other", updatedHiddenLibraryListKeys("other,new", "visible", "new"))
         assertEquals("other", updatedHiddenLibraryListKeys("old,other", "old", null))
         assertEquals("old,other", updatedHiddenLibraryListKeys("old,other", "old", "old"))
+    }
+
+    @Test fun `first profile activation inherits other settings without copying layout or hidden tabs`() = runBlocking {
+        val source = temporaryFolder.root.resolve("existing.preferences_pb")
+        val destination = temporaryFolder.root.resolve("new.preferences_pb")
+        val accent = stringPreferencesKey("theme_accent")
+        val skip = booleanPreferencesKey("show_skip_button")
+        source.sink().buffer().use {
+            PreferencesSerializer.writeTo(mutablePreferencesOf(
+                layout to "cinema", migration to 1, views to "", hiddenLists to "favorites",
+                accent to "purple", skip to false,
+            ), it)
+        }
+        val original = source.readBytes()
+        SettingsStore.copySettingsForNewProfile(source, destination)
+        val seeded = destination.source().buffer().use { PreferencesSerializer.readFrom(it) }
+        assertEquals("legacy", seeded[layout])
+        assertEquals(1, seeded[migration])
+        assertNull(seeded[views])
+        assertNull(seeded[hiddenLists])
+        assertEquals("purple", seeded[accent])
+        assertEquals(false, seeded[skip])
+        assertArrayEquals(original, source.readBytes())
+        val committed = destination.readBytes()
+        assertTrue(runCatching { SettingsStore.copySettingsForNewProfile(source, destination) }.isFailure)
+        assertArrayEquals(committed, destination.readBytes())
+        assertFalse(destination.resolveSibling("${destination.name}.new-profile").exists())
+    }
+
+    @Test fun `unreadable profile seed never replaces the source or creates live settings`() = runBlocking {
+        val source = temporaryFolder.newFile("corrupt.preferences_pb").apply { writeText("not a preference protobuf") }
+        val destination = temporaryFolder.root.resolve("new.preferences_pb")
+        val original = source.readBytes()
+        assertTrue(runCatching { SettingsStore.copySettingsForNewProfile(source, destination) }.exceptionOrNull() is CorruptionException)
+        assertFalse(destination.exists())
+        assertArrayEquals(original, source.readBytes())
     }
 }
