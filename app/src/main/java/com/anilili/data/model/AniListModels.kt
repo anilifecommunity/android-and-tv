@@ -98,7 +98,7 @@ data class MediaRelationEdge(
 )
 
 @Serializable
-data class MediaRelationConnection(val edges: List<MediaRelationEdge> = emptyList())
+data class MediaRelationConnection(val edges: List<MediaRelationEdge>? = null)
 
 /** One community "if you liked this" pick; the recommended title itself hangs off the node. */
 @Serializable

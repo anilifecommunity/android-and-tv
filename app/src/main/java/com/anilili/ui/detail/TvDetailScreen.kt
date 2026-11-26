@@ -529,7 +529,7 @@ internal fun TvDetailContent(
                 // this same row, after the tabs, rather than behind a tab of their own.
                 tabs = TvDetailTab.entries.filter { entry ->
                     when (entry) {
-                        TvDetailTab.EPISODES -> !isMovie
+                        TvDetailTab.EPISODES -> !isMovie || data.seasons.size > 1
                         TvDetailTab.RELATED -> franchise.isNotEmpty() || suggestions.isNotEmpty()
                     }
                 },
@@ -537,7 +537,7 @@ internal fun TvDetailContent(
                 selectedChipTarget = tabsFocusTarget,
                 // Only beside the episodes they switch between: on Related a season chip would
                 // change the header while nothing under it did.
-                seasons = if (tab == TvDetailTab.EPISODES && !isMovie) data.seasons else emptyList(),
+                seasons = if (tab == TvDetailTab.EPISODES) data.seasons else emptyList(),
                 seasonLabels = data.seasonLabels,
                 selectedSeasonId = data.selectedSeasonId,
                 onSelectSeason = onSelectSeason,
@@ -1350,15 +1350,21 @@ private fun TvDetailTabs(
         }
         if (showSeasons) {
             if (showTabs) TvSeasonSummaryRule()
-            seasons.forEachIndexed { index, season ->
-                val isOnShow = season.id == selectedSeasonId
-                TvDetailFilterChip(
-                    label = tvSeasonChipLabel(seasonLabels[season.id] ?: "Season ${index + 1}", season),
-                    selected = isOnShow,
-                    onClick = { onSelectSeason(season.id) },
-                    enabled = seasonChoosable(season, selectedSeasonId),
-                    modifier = if (isOnShow) Modifier.tvFocusTarget(selectedSeasonTarget) else Modifier,
-                )
+            continuationPickerGroups(seasons).forEachIndexed { groupIndex, group ->
+                if (groupIndex == 1 && group.isNotEmpty()) {
+                    TvSeasonSummaryRule()
+                    Text("Specials / Films", style = MaterialTheme.typography.labelMedium)
+                }
+                group.forEachIndexed { index, season ->
+                    val isOnShow = season.id == selectedSeasonId
+                    TvDetailFilterChip(
+                        label = tvSeasonChipLabel(seasonLabels[season.id] ?: "Season ${index + 1}", season),
+                        selected = isOnShow,
+                        onClick = { onSelectSeason(season.id) },
+                        enabled = seasonChoosable(season, selectedSeasonId),
+                        modifier = if (isOnShow) Modifier.tvFocusTarget(selectedSeasonTarget) else Modifier,
+                    )
+                }
             }
         }
         if (showShelves) {

@@ -376,7 +376,7 @@ class TmdbClient(
      * TMDB for the spin-off finds nothing, so without this both entries had no stills at all.
      */
     private suspend fun parentSpecialsRun(media: Media): List<EpisodeMetadata> {
-        val parent = media.relations.edges.firstOrNull { it.relationType == "PARENT" }?.node
+        val parent = media.relations.edges.orEmpty().firstOrNull { it.relationType == "PARENT" }?.node
             ?: return emptyList()
         val series = resolveSeries(parent, hint = null) ?: return emptyList()
         val specials = get("/tv/${series.id}/season/$SPECIALS_SEASON", TmdbSeason.serializer())

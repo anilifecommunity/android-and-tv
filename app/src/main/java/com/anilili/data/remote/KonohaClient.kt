@@ -64,9 +64,19 @@ data class KonohaDetail(
     val anilist: Media? = null,
     /** The season chain, walked by the generator exactly as the app walks it; the title included. */
     val series: List<Int> = emptyList(),
+    val seriesCoverage: KonohaSeriesCoverage? = null,
     /** AniList's community recommendations, best rated first, as list-card records. */
     val recommendations: List<Media> = emptyList(),
 )
+
+@Serializable
+data class KonohaSeriesCoverage(
+    val coverage: String? = null,
+    val unresolvedIds: List<Int> = emptyList(),
+    val truncated: Boolean = false,
+) {
+    val complete: Boolean get() = coverage == "complete" && unresolvedIds.isEmpty() && !truncated
+}
 
 /**
  * The Bangumi subject this title was matched to, and the names to search Chinese sources with.

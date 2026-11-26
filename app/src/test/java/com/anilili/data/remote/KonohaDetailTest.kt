@@ -49,7 +49,7 @@ class KonohaDetailTest {
         val media = oneP1ece.toMedia(anilistId = 21)
         assertNull(media.nextAiringEpisode)
         assertNull(media.trailer)
-        assertEquals(emptyList<Any>(), media.relations.edges)
+        assertNull(media.relations.edges)
         assertEquals(emptyList<Any>(), media.studios.nodes)
     }
 

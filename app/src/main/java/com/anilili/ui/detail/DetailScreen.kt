@@ -371,10 +371,11 @@ private fun DetailScreenBody(
                     actions = {
                         val context = LocalContext.current
                         val shareFocus = rememberFocusFill()
-                        val title = (state as? UiState.Success)?.data?.info?.title?.preferred
+                        val selected = (state as? UiState.Success)?.data?.selectedSeason
+                        val title = selected?.title?.preferred
                         IconButton(
                             colors = shareFocus.iconButtonColors(IconButtonDefaults.iconButtonColors()),
-                            onClick = { shareAnimeLink(context, animeId, title) },
+                            onClick = { shareAnimeLink(context, selected?.id ?: animeId, title) },
                             modifier = Modifier.focusFill(shareFocus, RoundedCornerShape(24.dp)),
                         ) {
                             Icon(Icons.Default.Share, contentDescription = "Share link")
@@ -409,7 +410,7 @@ private fun DetailScreenBody(
                 modifier = Modifier.padding(padding),
             )
             is UiState.Success -> {
-                val info = s.data.info
+                val info = s.data.selectedSeason
                 val saved = watchlist.any { it.anilistId == info.id }
                 val listStatusLabel = mediaListStatusLabel(remoteStatuses[info.id])
                     ?: localWatchedLabel(localWatched, info.id)
@@ -434,7 +435,7 @@ private fun DetailScreenBody(
                         data = s.data,
                         saved = saved,
                         listStatusLabel = listStatusLabel,
-                        resume = history.firstOrNull { it.anilistId == animeId },
+                        resume = history.firstOrNull { it.anilistId == info.id },
                         history = history,
                         saveEntry = WatchlistEntry(
                             anilistId = info.id,
@@ -482,7 +483,7 @@ private fun DetailContent(
     detailListState: LazyListState,
     contentPadding: PaddingValues = PaddingValues(),
 ) {
-    val info = data.info
+    val info = data.selectedSeason
     // The episode rows belong to the season the chips selected, not to the anime the page was
     // opened on, so what has aired has to be read from that one — `info.nextAiringEpisode` is the
     // schedule of a different season as soon as the viewer switches.
@@ -490,9 +491,9 @@ private fun DetailContent(
     val device = LocalAppDeviceProfile.current
     val episodes = data.episodes
     val isMovie = isMovieFormat(info.format)
-    var selectedTab by remember(info.id) { mutableStateOf(DetailTab.HOME) }
-    val visibleTabs = remember(isMovie) {
-        DetailTab.entries.filterNot { isMovie && it == DetailTab.EPISODES }
+    var selectedTab by remember(data.info.id) { mutableStateOf(DetailTab.HOME) }
+    val visibleTabs = remember(isMovie, data.seasons.size) {
+        DetailTab.entries.filterNot { isMovie && data.seasons.size <= 1 && it == DetailTab.EPISODES }
     }
     var relatedFilter by remember(info.id) { mutableStateOf(RelatedFilter.ALL) }
     val canWatch = episodes.isNotEmpty()
@@ -606,10 +607,7 @@ private fun DetailContent(
             item {
                 DetailHero(
                     info = info,
-                    // This hero always shows the page's own title and cover, so it takes the page's
-                    // logo rather than the selected season's — which used to leave it with none at
-                    // all as soon as another season chip was picked. See DetailData.pageLogo.
-                    logo = data.pageLogo,
+                    logo = data.logo,
                     onStudioClick = onStudioClick,
                     onCoverClick = { coverPreviewVisible = true },
                     topInset = contentPadding.calculateTopPadding(),
@@ -1493,45 +1491,52 @@ private fun SeasonFilterRow(
         ),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
-        items(seasons.size) { index ->
-            val season = seasons[index]
-            val active = season.id == selectedSeasonId
-            val choosable = seasonChoosable(season, selectedSeasonId)
-            val fillFocus5 = rememberFocusFill()
-            Column(
-                modifier = Modifier
-                    // An upcoming season is shown, faded, and cannot be chosen; see seasonChoosable.
-                    .alpha(if (choosable) 1f else 0.38f)
-                    .focusFill(fillFocus5, RoundedCornerShape(12.dp))
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        fillFocus5.background(if (active) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surface),
-                    )
-                    .border(
-                        1.dp,
-                        if (active) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outline,
-                        RoundedCornerShape(12.dp),
-                    )
-                    .clickable(enabled = choosable) { onSelect(season.id) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text = labels[season.id] ?: "Season ${index + 1}",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                    color = fillFocus5.content(if (active) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurface),
-                )
-                (season.seasonYear ?: season.startDate?.year)?.let { year ->
+        continuationPickerGroups(seasons).forEachIndexed { groupIndex, group ->
+            if (groupIndex == 1 && group.isNotEmpty()) {
+                item(key = "continuation-extras") {
+                    Text("Specials / Films", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(8.dp))
+                }
+            }
+            items(group.size, key = { index -> group[index].id }) { index ->
+                val season = group[index]
+                val active = season.id == selectedSeasonId
+                val choosable = seasonChoosable(season, selectedSeasonId)
+                val fillFocus5 = rememberFocusFill()
+                Column(
+                    modifier = Modifier
+                        // An upcoming season is shown, faded, and cannot be chosen; see seasonChoosable.
+                        .alpha(if (choosable) 1f else 0.38f)
+                        .focusFill(fillFocus5, RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            fillFocus5.background(if (active) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.surface),
+                        )
+                        .border(
+                            1.dp,
+                            if (active) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.outline,
+                            RoundedCornerShape(12.dp),
+                        )
+                        .clickable(enabled = choosable) { onSelect(season.id) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text(
-                        text = if (season.isUpcoming()) "$year · Upcoming" else year.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = fillFocus5.content(if (active) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
-                        else MaterialTheme.colorScheme.onSurfaceVariant),
+                        text = labels[season.id] ?: "Season ${index + 1}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
+                        color = fillFocus5.content(if (active) MaterialTheme.colorScheme.onPrimary
+                        else MaterialTheme.colorScheme.onSurface),
                     )
+                    (season.seasonYear ?: season.startDate?.year)?.let { year ->
+                        Text(
+                            text = if (season.isUpcoming()) "$year · Upcoming" else year.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = fillFocus5.content(if (active) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f)
+                            else MaterialTheme.colorScheme.onSurfaceVariant),
+                        )
+                    }
                 }
             }
         }

@@ -2159,94 +2159,33 @@ class MiruroRepository(
         return if (hideAdult) recommended.filterNot { it.isAdult } else recommended
     }
 
-    /** Walks AniList's PREQUEL/SEQUEL chain so every season is reachable from one detail page. */
+    /** Unfiltered continuation membership is cached separately from hydration and profile visibility. */
     suspend fun animeSeries(root: Media): List<Media> {
-        // Season chains change rarely, so the walked chain's ids are cached under EVERY member
-        // id: whichever season's page the user opens, the full series hydrates instantly from
-        // the animeInfo cache (filled during the walk) instead of re-walking AniList relations.
-        val idsSerializer = ListSerializer(Int.serializer())
-        cache.getIfFresh("$SERIES_KEY_PREFIX${root.id}", idsSerializer)?.let { ids ->
-            val members = ids.mapNotNull { id ->
-                if (id == root.id) root else runCatching { animeInfo(id) }.getOrNull()
-            }
-            if (members.isNotEmpty()) {
-                val withRoot = if (members.none { it.id == root.id }) members + root else members
-                // Two cached ids can resolve to one entry (AniList merges duplicate media), and
-                // the detail screens key their lazy rows by media id — a repeat is not a cosmetic
-                // problem there, it throws "Key ... was already used" and takes the app down.
-                return withRoot.distinctBy(Media::id).sortedWith(SERIES_AIRING_ORDER)
-            }
+        if (root.id <= 0) return listOf(root)
+        val serializer = SeriesMembership.serializer()
+        val fetch: suspend (Int) -> Media? = { id -> seriesFetchGate.withPermit { animeInfo(id) } }
+        fun visible(members: List<Media>) = visibleSeriesMembers(root.id, members, hideAdult)
+        cache.getIfFresh("$SERIES_CACHE_PREFIX${root.id}", serializer)?.takeIf {
+            root.id in it.ids && it.ids.size <= MAX_SERIES_ENTRIES && it.ids.all { id -> id > 0 }
+        }?.let { return visible(hydrateSeriesMembers(root, it.ids, fetch)) }
+
+        val detail = runCatching { konoha.details(root.id) }.onFailure { it.rethrowIfCancellation() }.getOrNull()
+        val ids = detail?.series?.takeIf { root.id in it } ?: emptyList()
+        val verified = detail?.seriesCoverage?.complete == true && ids.isNotEmpty() &&
+            ids.size <= MAX_SERIES_ENTRIES && ids.all { it > 0 }
+        val chain = if (verified) {
+            LoadedSeries(SeriesMembership(ids.distinct(), complete = true), hydrateSeriesMembers(root, ids, fetch))
+        } else {
+            val walked = walkSeriesMembers(root, ids, fetch)
+            // Only the catalogue can certify inverse-edge coverage; an outbound walk is provisional.
+            walked.copy(membership = walked.membership.copy(complete = false))
         }
-
-        val chain = treeSeriesChain(root) ?: walkSeriesChain(root).distinctBy(Media::id)
-        val payload = kotlinx.serialization.json.Json.encodeToString(idsSerializer, chain.map(Media::id))
-        cache.putBatch(chain.associate { "$SERIES_KEY_PREFIX${it.id}" to payload }, INFO_TTL)
-        return chain
-    }
-
-    /**
-     * The season chain the generator already walked, its members fetched side by side.
-     *
-     * The walk below goes one hop at a time — each season's relations have to arrive before the next
-     * can be asked for — so an eight-season franchise was eight round trips in a row even when every
-     * one of them was cached. The tree holds the finished chain, so every member is asked for at
-     * once. Null when the tree has no chain for this title, which leaves the walk to answer.
-     */
-    private suspend fun treeSeriesChain(root: Media): List<Media>? = coroutineScope {
-        val detail: com.anilili.data.remote.KonohaDetail? = runCatching { konoha.details(root.id) }.getOrNull()
-        // Not `.orEmpty()`: this class has a private `Any?.orEmpty(): String` that would win.
-        val ids: List<Int> = detail?.series ?: emptyList()
-        if (root.id !in ids) return@coroutineScope null
-        val hideAdult = hideAdult
-        val members = ids.map { id ->
-            async {
-                if (id == root.id) root else seriesFetchGate.withPermit { runCatching { animeInfo(id) }.getOrNull() }
-            }
-        }.awaitAll().filterNotNull()
-        members
-            .filterNot { hideAdult && it.isAdult && it.id != root.id }
-            .distinctBy(Media::id)
-            .sortedWith(SERIES_AIRING_ORDER)
-    }
-
-    private suspend fun walkSeriesChain(root: Media): List<Media> = coroutineScope {
-        val found = linkedMapOf(root.id to root)
-        val expanded = mutableSetOf<Int>()
-        var frontier = listOf(root)
-        var depth = 0
-
-        while (frontier.isNotEmpty() && found.size < MAX_SERIES_ENTRIES && depth < MAX_SERIES_DEPTH) {
-            val batch = frontier
-                .filter { expanded.add(it.id) }
-                .take(MAX_SERIES_ENTRIES - found.size + 1)
-            if (batch.isEmpty()) break
-
-            val detailed = batch.map { media ->
-                async {
-                    if (media.id == root.id && media.relations.edges.isNotEmpty()) {
-                        media
-                    } else {
-                        seriesFetchGate.withPermit { runCatching { animeInfo(media.id) }.getOrNull() } ?: media
-                    }
-                }
-            }.awaitAll()
-
-            val next = mutableListOf<Media>()
-            detailed.forEach { media ->
-                found[media.id] = media
-                media.seasonNeighbors().forEach { neighbor ->
-                    if (hideAdult && neighbor.isAdult) return@forEach
-                    if (neighbor.id !in found && found.size < MAX_SERIES_ENTRIES) {
-                        found[neighbor.id] = neighbor
-                    }
-                    if (neighbor.id !in expanded) next += neighbor
-                }
-            }
-            frontier = next.distinctBy(Media::id)
-            depth++
-        }
-
-        found.values.sortedWith(SERIES_AIRING_ORDER)
+        val payload = kotlinx.serialization.json.Json.encodeToString(serializer, chain.membership)
+        cache.putBatch(
+            seriesCacheEntries(root.id, chain.membership).associateWith { payload },
+            if (chain.membership.complete) INFO_TTL else 2L * 60 * 1000,
+        )
+        return visible(chain.members)
     }
 
     // ---- streaming (two backends, cached per source) ----
@@ -2942,8 +2881,6 @@ class MiruroRepository(
             setOf("CURRENT", "REPEATING", "PLANNING", "PAUSED", "COMPLETED", "DROPPED")
         /** Statuses whose AniList record can no longer change, so the tree's copy is as good. */
         val SETTLED_STATUSES = setOf("FINISHED", "CANCELLED")
-        const val MAX_SERIES_ENTRIES = 16
-        const val MAX_SERIES_DEPTH = 8
         const val SERIES_FETCH_CONCURRENCY = 2
         const val SCHEDULE_TTL = 15L * 60 * 1000
         /** Days of padding either side of a published month. Mirrors the generator's own constant. */
@@ -2994,7 +2931,6 @@ class MiruroRepository(
         val INTERACTIVE_CHALLENGE_PROVIDERS = setOf("allanime")
         const val INFO_TTL = 24L * 60 * 60 * 1000
         const val OPTIONS_TTL = 7L * 24 * 60 * 60 * 1000
-        const val SERIES_KEY_PREFIX = "series:v1:"
 
         /** Provider stream URLs are short-lived; a stale preheat is worse than a live resolve. */
         const val PREHEAT_TTL_MS = 5L * 60 * 1000
@@ -3020,10 +2956,11 @@ internal val SERIES_AIRING_ORDER: Comparator<Media> = compareBy(
  */
 internal fun batchCacheKey(prefix: String, ids: List<Int>): String = "$prefix${ids.joinToString(",")}"
 
-internal fun Media.seasonNeighbors(): List<Media> = relations.edges
+internal fun Media.seasonNeighbors(): List<Media> = relations.edges.orEmpty()
     .asSequence()
     .filter { it.relationType == "PREQUEL" || it.relationType == "SEQUEL" }
     .mapNotNull { it.node }
+    .filter { it.id > 0 && it.format !in setOf("MANGA", "NOVEL", "ONE_SHOT") }
     .distinctBy(Media::id)
     .toList()
 

@@ -3,6 +3,33 @@ package com.anilili.ui.detail
 import com.anilili.data.model.Media
 import com.anilili.data.remote.TvdbRef
 
+internal fun Media.isExtraContinuation(): Boolean = format in setOf("MOVIE", "SPECIAL", "OVA") || format == null
+
+internal fun continuationPickerGroups(members: List<Media>): List<List<Media>> = listOf(
+    members.filterNot(Media::isExtraContinuation), members.filter(Media::isExtraContinuation),
+)
+
+internal fun continuationLabels(members: List<Media>, ref: (Int) -> TvdbRef?): Map<Int, String> {
+    val labels = seasonLabels(members.filterNot(Media::isExtraContinuation), ref).toMutableMap()
+    val seen = mutableMapOf<String, Int>()
+    members.forEach { media ->
+        if (media.isExtraContinuation()) {
+            val group = when (media.format) { "MOVIE" -> "Film"; "SPECIAL" -> "Special"; "OVA" -> "OVA"; else -> "Entry" }
+            val number = (seen[group] ?: 0) + 1
+            seen[group] = number
+            labels[media.id] = "$group $number"
+        } else {
+            STAGE_LABEL.find(media.title.preferred)?.groupValues?.get(1)?.let { stages ->
+                val numbers = stages.replace(Regex("(?i)(st|nd|rd|th)"), "").replace(Regex("\\s*[&–-]\\s*"), "–")
+                labels[media.id] = "Stage $numbers"
+            }
+        }
+    }
+    return labels
+}
+
+private val STAGE_LABEL = Regex("""\b(\d+(?:st|nd|rd|th)?(?:\s*[&–-]\s*\d+(?:st|nd|rd|th)?)?)\s+stage\b""", RegexOption.IGNORE_CASE)
+
 /**
  * What to call each entry of a season picker, by AniList id: "Season 2", "Season 2 Part 2", or —
  * when every entry is one season split into parts — just "Part 3".
