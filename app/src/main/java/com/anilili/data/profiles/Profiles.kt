@@ -22,6 +22,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.io.IOException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.UUID
@@ -64,7 +65,7 @@ data class LocalProfile(
  * is a process singleton that read it once. Re-initialising them in place would have to find and
  * reset every one of those caches, and a single one missed would show one person another person's
  * list. So the active profile's files simply *are* the ordinary SharedPreferences files, and a
- * switch moves them aside and moves the other profile's in, in a fresh process, before anything
+ * switch snapshots them and installs the other profile's copies, in a fresh process, before anything
  * has opened them ([init] runs ahead of every store in `MiruroApp.onCreate`). Nothing else in the
  * app knows profiles exist.
  */
@@ -73,6 +74,7 @@ object Profiles {
     private const val KEY_PROFILES = "profiles"
     private const val KEY_ACTIVE = "active"
     private const val KEY_PENDING = "pending_switch"
+    private const val KEY_SWITCH_SAVED = "switch_saved"
     private const val KEY_LOGIN_COOKIES_STALE = "login_cookies_stale"
     private const val PROFILE_DIR = "profiles"
     private const val SETTINGS_WRITE_GRACE_MS = 400L
@@ -122,7 +124,7 @@ object Profiles {
 
     /**
      * Must run before any store opens a per-profile file: a SharedPreferences instance is
-     * cached for the life of the process, so a file moved after it was read would be written back
+     * cached for the life of the process, so a file replaced after it was read would be written back
      * over by the stale copy.
      */
     fun init(context: Context) {
@@ -140,41 +142,45 @@ object Profiles {
         val target = prefs.getString(KEY_PENDING, null) ?: return
         val current = _activeId.value
         if (current == null || target == current || _profiles.value.none { it.id == target }) {
-            prefs.edit().remove(KEY_PENDING).commit()
+            if (!prefs.edit().remove(KEY_PENDING).remove(KEY_SWITCH_SAVED).commit()) {
+                throw IOException("Profile switch state could not be saved")
+            }
             return
         }
         val outgoing = profileDir(current).apply { mkdirs() }
         val incoming = profileDir(target)
         val files = liveFiles()
-        // Save first, restore second. Each move is a rename on one filesystem, and a save only ever
-        // replaces its destination when there is something to save, so a switch interrupted at any
-        // point leaves both copies intact and simply runs again on the next start.
-        files.forEach { live ->
-            File(live.parentFile, "${live.nameWithoutExtension}.bak").delete()
-            if (live.exists()) move(live, File(outgoing, live.name))
-        }
-        files.forEach { live ->
-            val saved = File(incoming, live.name)
-            when {
-                saved.exists() -> move(saved, live)
-                // Inherit the TV's appearance/player preferences, with fresh layout/tab ownership.
-                live.name == SETTINGS_FILE -> File(outgoing, live.name).takeIf(File::exists)
-                    ?.let { source ->
+        val marker = "$current:$target"
+        ProfileFileSwitch.apply(
+            files, outgoing, incoming,
+            saved = prefs.getString(KEY_SWITCH_SAVED, null) == marker,
+            prepareIncoming = {
+                val inherited = File(incoming, SETTINGS_FILE)
+                if (!inherited.exists()) {
+                    File(outgoing, SETTINGS_FILE).takeIf(File::exists)?.let { source ->
                         try {
-                            runBlocking(Dispatchers.IO) { SettingsStore.copySettingsForNewProfile(source, live) }
+                            runBlocking(Dispatchers.IO) { SettingsStore.copySettingsForNewProfile(source, inherited) }
                         } catch (error: CorruptionException) {
                             DiagnosticsLog.throwable("New profile starts with defaults: inherited settings unreadable", error)
                         }
                     }
-            }
-        }
+                }
+            },
+            markSaved = {
+                if (!prefs.edit().putString(KEY_SWITCH_SAVED, marker).commit()) {
+                    throw IOException("Profile snapshot could not be committed")
+                }
+            },
+        )
         outgoingSettingsFile = File(outgoing, SETTINGS_FILE)
-        _activeId.value = target
-        prefs.edit()
+        val committed = prefs.edit()
             .putString(KEY_ACTIVE, target)
             .remove(KEY_PENDING)
+            .remove(KEY_SWITCH_SAVED)
             .putBoolean(KEY_LOGIN_COOKIES_STALE, true)
             .commit()
+        if (!committed) throw IOException("Active profile could not be committed")
+        _activeId.value = target
         justSwitched = true
         DiagnosticsLog.event("Profiles switched from=$current to=$target")
     }
@@ -184,15 +190,6 @@ object Profiles {
         val sharedPrefs = File(appContext.applicationInfo.dataDir, "shared_prefs")
         return PROFILE_PREFS.map { File(sharedPrefs, "$it.xml") } +
             File(File(appContext.filesDir, "datastore"), SETTINGS_FILE)
-    }
-
-    private fun move(from: File, to: File) {
-        to.parentFile?.mkdirs()
-        to.delete()
-        if (!from.renameTo(to)) {
-            from.copyTo(to, overwrite = true)
-            from.delete()
-        }
     }
 
     private fun profileDir(id: String) = File(File(appContext.filesDir, PROFILE_DIR), id)
@@ -291,7 +288,6 @@ object Profiles {
         if (id == _activeId.value || _profiles.value.none { it.id == id }) return
         DiagnosticsLog.event("Profiles switch requested to=$id")
         withContext(Dispatchers.IO) {
-            prefs.edit().putString(KEY_PENDING, id).commit()
             // Progress still queued for the outgoing account would otherwise run after the restart
             // and be delivered to whoever is signed in then — the next profile's account.
             runCatching { ListProgressSyncWorker.cancelAll(appContext) }
@@ -300,14 +296,19 @@ object Profiles {
                 .onFailure { DiagnosticsLog.throwable("Profiles Simkl sync cancel failed", it) }
             // The launcher's Continue Watching row is the outgoing person's.
             WatchNextManager.removeAll(appContext)
-            // An empty commit waits for every queued apply() on that file, so the move in the next
+            // An empty commit waits for every queued apply() on that file, so the snapshot in the next
             // process sees what was last written rather than what was last flushed.
             PROFILE_PREFS.forEach { name ->
-                appContext.getSharedPreferences(name, Context.MODE_PRIVATE).edit().commit()
+                if (!appContext.getSharedPreferences(name, Context.MODE_PRIVATE).edit().commit()) {
+                    throw IOException("Profile changes could not be saved")
+                }
             }
             // Settings saves are fire-and-forget DataStore writes; a change made a moment ago
             // (the picker is one press from Settings) gets time to land before the process goes.
             delay(SETTINGS_WRITE_GRACE_MS)
+            if (!prefs.edit().putString(KEY_PENDING, id).remove(KEY_SWITCH_SAVED).commit()) {
+                throw IOException("Profile switch request could not be saved")
+            }
         }
         activity.startActivity(
             Intent(activity, ProfileRestartActivity::class.java)

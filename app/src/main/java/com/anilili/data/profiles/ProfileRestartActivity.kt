@@ -11,7 +11,7 @@ import com.anilili.MainActivity
  *
  * Declared in a process of its own (`:profile_restart`), because the thing being restarted is the
  * process that asked: it kills the app's main process, then launches the main activity, which comes
- * up in a fresh one where [Profiles.init] moves the new profile's files into place before anything
+ * up in a fresh one where [Profiles.init] installs the new profile's files before anything
  * reads them. Started from a visible activity, so the launch it makes in turn is a foreground one
  * and is not caught by Android's background activity-start limits the way an alarm would be.
  */

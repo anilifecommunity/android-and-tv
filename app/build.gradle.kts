@@ -180,6 +180,7 @@ android {
     }
     testOptions {
         unitTests {
+            isIncludeAndroidResources = true
             // Production code logs through DiagnosticsLog, which reads SystemClock. Without this,
             // any unit test that walks a logging path dies on "not mocked" instead of asserting.
             isReturnDefaultValues = true
@@ -337,6 +338,8 @@ dependencies {
     implementation(libs.acinq.secp256k1.android)
     baselineProfile(project(":benchmark"))
     testImplementation(libs.junit)
+    // 4.16+ drops API 22, which remains a supported application platform.
+    testImplementation("org.robolectric:robolectric:4.15.1")
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.acinq.secp256k1.jvm)
     // A real org.json on the unit-test classpath. The one in android.jar is a stub whose methods
