@@ -4,7 +4,6 @@ import com.anilili.data.auth.AccountService
 import com.anilili.data.auth.AuthManager
 import com.anilili.data.model.GqlMediaListResponse
 import com.anilili.data.model.GqlDiscoverOptionsResponse
-import com.anilili.data.model.GqlHomeCollectionsResponse
 import com.anilili.data.model.GqlMediaResponse
 import com.anilili.data.model.GqlPageResponse
 import com.anilili.data.model.GqlRecommendationsResponse
@@ -14,7 +13,6 @@ import com.anilili.data.model.GqlViewerFavouritesResponse
 import com.anilili.data.model.GqlViewerOptionsResponse
 import com.anilili.data.model.GraphQLRequest
 import com.anilili.data.model.Media
-import com.anilili.data.model.HomeCollections
 import com.anilili.data.model.DiscoverFilters
 import com.anilili.data.model.DiscoverOptions
 import com.anilili.data.model.MediaListCollection
@@ -182,74 +180,16 @@ class AniListClient(
         withContext(Dispatchers.IO) {
             val text = post(query, variables)
             val parsed = json.decodeFromString(GqlPageResponse.serializer(), text).data?.page
+                ?: error("AniList omitted the requested media page")
             MediaPage(
-                items = parsed?.media ?: emptyList(),
-                hasNextPage = parsed?.pageInfo?.hasNextPage ?: false,
+                items = parsed.media,
+                hasNextPage = parsed.pageInfo.hasNextPage,
                 page = page,
                 // Only the Browse query asks for `total`; everywhere else pageInfo carries the
                 // default 0, which is exactly what "cannot say" means to the caller.
-                total = parsed?.pageInfo?.total ?: 0,
+                total = parsed.pageInfo.total,
             )
         }
-
-    /**
-     * The six Home collections in one GraphQL operation, avoiding a burst on every cold start.
-     *
-     * "Popular" is the rail titled "Popular this season", so it is scoped to [season]: sorted by
-     * popularity alone it was all-time popularity, and the same decade-old titles filled it every
-     * season.
-     */
-    suspend fun homeCollections(
-        season: AiringSeason = AiringSeason.current(),
-        hideAdult: Boolean = false,
-    ): HomeCollections = withContext(Dispatchers.IO) {
-        val gql = """
-            query (${'$'}isAdult: Boolean, ${'$'}airedBefore: Int, ${'$'}season: MediaSeason, ${'$'}seasonYear: Int) {
-              spotlight: Page(page: 1, perPage: 30) {
-                media(type: ANIME, sort: [TRENDING_DESC], isAdult: ${'$'}isAdult) { $mediaSpotlightFields }
-              }
-              newest: Page(page: 1, perPage: 50) {
-                airingSchedules(airingAt_lesser: ${'$'}airedBefore, sort: TIME_DESC) {
-                  media { $mediaListFields }
-                }
-              }
-              popular: Page(page: 1, perPage: 30) {
-                media(type: ANIME, season: ${'$'}season, seasonYear: ${'$'}seasonYear, sort: [POPULARITY_DESC], isAdult: ${'$'}isAdult) { $mediaListFields }
-              }
-              movies: Page(page: 1, perPage: 30) {
-                media(type: ANIME, format: MOVIE, sort: [POPULARITY_DESC], isAdult: ${'$'}isAdult) { $mediaListFields }
-              }
-              topRated: Page(page: 1, perPage: 30) {
-                media(type: ANIME, sort: [SCORE_DESC], isAdult: ${'$'}isAdult) { $mediaListFields }
-              }
-              upcoming: Page(page: 1, perPage: 30) {
-                media(type: ANIME, status: NOT_YET_RELEASED, sort: [POPULARITY_DESC], isAdult: ${'$'}isAdult) { $mediaListFields }
-              }
-            }
-        """.trimIndent()
-        val variables = buildJsonObject {
-            if (hideAdult) put("isAdult", false)
-            put("season", season.season)
-            put("seasonYear", season.year)
-            // airingAt is the broadcast start; allow ~25 min runtime plus an hour for
-            // streaming sites to pick the episode up, so every entry is actually watchable.
-            put("airedBefore", System.currentTimeMillis() / 1000 - NEWEST_AIRED_BUFFER_SEC)
-        }
-        val data = json.decodeFromString(GqlHomeCollectionsResponse.serializer(), post(gql, variables)).data
-        HomeCollections(
-            spotlight = data?.spotlight?.media.orEmpty(),
-            // Recently aired episodes, newest first; a show airing several times in the
-            // window appears once. isAdult can't be filtered inside airingSchedules.
-            newest = data?.newest?.airingSchedules.orEmpty()
-                .mapNotNull { it.media }
-                .distinctBy { it.id }
-                .filterNot { hideAdult && it.isAdult },
-            popular = data?.popular?.media.orEmpty(),
-            movies = data?.movies?.media.orEmpty(),
-            topRated = data?.topRated?.media.orEmpty(),
-            upcoming = data?.upcoming?.media.orEmpty(),
-        )
-    }
 
     suspend fun search(query: String, page: Int = 1, perPage: Int = 20, hideAdult: Boolean = false): MediaPage {
         val gql = """
@@ -472,6 +412,7 @@ class AniListClient(
         page: Int = 1,
         perPage: Int = 20,
         hideAdult: Boolean = false,
+        spotlight: Boolean = false,
     ): MediaPage {
         val statusFilter = if (status != null) ", status: $status" else ""
         val seasonFilter = if (season != null) ", season: ${season.season}, seasonYear: ${season.year}" else ""
@@ -481,7 +422,7 @@ class AniListClient(
             query (${'$'}page: Int, ${'$'}perPage: Int) {
               Page(page: ${'$'}page, perPage: ${'$'}perPage) {
                 pageInfo { hasNextPage currentPage }
-                media(type: ANIME, sort: [$sort]$statusFilter$formatFilter$seasonFilter$adultFilter) { $mediaListFields }
+                media(type: ANIME, sort: [$sort]$statusFilter$formatFilter$seasonFilter$adultFilter) { ${if (spotlight) mediaSpotlightFields else mediaListFields} }
               }
             }
         """.trimIndent()
@@ -490,6 +431,32 @@ class AniListClient(
             put("perPage", perPage)
         }
         return queryPage(gql, vars, page)
+    }
+
+    /** The same aired-episode ordering as Home's original batch, paged independently. */
+    suspend fun latestAired(page: Int, hideAdult: Boolean): MediaPage = withContext(Dispatchers.IO) {
+        val query = """
+            query (${'$'}page: Int, ${'$'}airedBefore: Int) {
+              Page(page: ${'$'}page, perPage: 50) {
+                pageInfo { hasNextPage currentPage }
+                airingSchedules(airingAt_lesser: ${'$'}airedBefore, sort: TIME_DESC) {
+                  media { $mediaListFields }
+                }
+              }
+            }
+        """.trimIndent()
+        val variables = buildJsonObject {
+            put("page", page)
+            put("airedBefore", System.currentTimeMillis() / 1000 - NEWEST_AIRED_BUFFER_SEC)
+        }
+        val result = json.decodeFromString(
+            com.anilili.data.model.GqlScheduleResponse.serializer(), post(query, variables),
+        ).data?.page ?: error("AniList omitted the aired-episode page")
+        MediaPage(
+            result.airingSchedules.mapNotNull { it.media }.distinctBy { it.id }.filterNot { hideAdult && it.isAdult },
+            result.pageInfo.hasNextPage,
+            page,
+        )
     }
 
     /** Episodes airing in the half-open range [startSec, endExclusiveSec), sorted by time. */

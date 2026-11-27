@@ -16,6 +16,7 @@ import com.anilili.data.model.Media
 import com.anilili.data.model.MediaPage
 import com.anilili.data.model.StudioNode
 import com.anilili.data.model.HomeCollections
+import com.anilili.data.model.HomeSection
 import com.anilili.data.model.ScheduleDayCount
 import com.anilili.data.model.SourcesResult
 import com.anilili.data.model.SourceVariant
@@ -775,9 +776,6 @@ class MiruroRepository(
     /** User preference: keep hentai out of every browsing surface. */
     private val hideAdult: Boolean get() = SettingsStore.hideAdultContent.value
 
-    // Bounds the related-seasons walk's AniList fan-out so it can't monopolise the shared,
-    // rate-limited connection pool (5/host) and stall playback-critical metadata/catalog lookups.
-    private val seriesFetchGate = Semaphore(SERIES_FETCH_CONCURRENCY)
     private val sourceFailureCooldowns = SourceFailureCooldowns()
 
     /**
@@ -790,43 +788,61 @@ class MiruroRepository(
     fun tvdbRefFor(anilistId: Int): TvdbRef? = konoha.tvdbRefFor(anilistId)
 
     // ---- discovery (AniList) ----
-    /** [maxAgeMs]: see [AppCache.getOrFetch]; Home passes it to swap cached rows for live ones. */
-    suspend fun homeCollections(force: Boolean = false, maxAgeMs: Long? = null): HomeCollections {
-        val adultHidden = hideAdult
-        // The season is in the key so a cached "this season" row cannot outlive the season.
+    /** Read-only startup seed; this must never schedule an offscreen network refresh. */
+    suspend fun cachedHomeCollections(): HomeCollections? {
         val season = AiringSeason.current()
-        val collections = try {
-            cache.getOrFetch(
-                key = "home:v4:${season.season}-${season.year}:${if (adultHidden) "sfw" else "all"}",
-                serializer = HomeCollections.serializer(),
-                ttlMs = HOME_TTL,
-                forceRefresh = force,
-                maxAgeMs = maxAgeMs,
-            ) { aniList.homeCollections(season, adultHidden) }
-        } catch (e: Exception) {
-            e.rethrowIfCancellation()
-            throw e
-        }
-        if (!adultHidden) return collections
-        return collections.copy(
-            spotlight = collections.spotlight.filterNot { it.isAdult },
-            newest = collections.newest.filterNot { it.isAdult },
-            popular = collections.popular.filterNot { it.isAdult },
-            movies = collections.movies.filterNot { it.isAdult },
-            topRated = collections.topRated.filterNot { it.isAdult },
-            upcoming = collections.upcoming.filterNot { it.isAdult },
+        val adultHidden = hideAdult
+        val legacy = cache.getIfFresh(
+            "home:v4:${season.season}-${season.year}:${if (adultHidden) "sfw" else "all"}",
+            HomeCollections.serializer(),
         )
+        val pages = HomeSection.entries.mapNotNull { section ->
+            cache.getIfFresh(homeRowCacheKey(section, 1, season, adultHidden), MediaPage.serializer())
+                ?.let { section to it.items }
+        }.toMap()
+        if (legacy == null && pages.isEmpty()) return null
+        val rows = HomeCollections(
+            spotlight = pages[HomeSection.TRENDING] ?: legacy?.spotlight ?: emptyList(),
+            newest = pages[HomeSection.NEWEST] ?: legacy?.newest ?: emptyList(),
+            popular = pages[HomeSection.POPULAR] ?: legacy?.popular ?: emptyList(),
+            movies = pages[HomeSection.MOVIES] ?: legacy?.movies ?: emptyList(),
+            topRated = pages[HomeSection.TOP_RATED] ?: legacy?.topRated ?: emptyList(),
+            upcoming = pages[HomeSection.UPCOMING] ?: legacy?.upcoming ?: emptyList(),
+        )
+        return if (!adultHidden) rows else rows.copy(
+                spotlight = rows.spotlight.filterNot { it.isAdult }, newest = rows.newest.filterNot { it.isAdult },
+                popular = rows.popular.filterNot { it.isAdult }, movies = rows.movies.filterNot { it.isAdult },
+                topRated = rows.topRated.filterNot { it.isAdult }, upcoming = rows.upcoming.filterNot { it.isAdult },
+            )
     }
 
-    /**
-     * Home rows from the catalogue snapshot in the APK, for when [homeCollections] has nothing.
-     *
-     * Deliberately its own call rather than a catch inside [homeCollections]: the caller puts a
-     * network timeout around that one, and parsing four megabytes of JSON inside that window blew
-     * it — the first attempt at this shipped a "Home request timed out" where the offline rows
-     * should have been. Null when the snapshot is unreadable, so the caller can still show the real
-     * error rather than an empty screen.
-     */
+    private fun homeRowCacheKey(section: HomeSection, page: Int, season: AiringSeason, adultHidden: Boolean) =
+        "home-row:v1:${section.name}:${season.season}-${season.year}:$page:${if (adultHidden) "sfw" else "all"}"
+
+    suspend fun homePage(section: HomeSection, page: Int, force: Boolean): MediaPage {
+        val adultHidden = hideAdult
+        val season = AiringSeason.current()
+        val result = cache.getOrFetch(
+            key = homeRowCacheKey(section, page, season, adultHidden),
+            serializer = MediaPage.serializer(),
+            ttlMs = if (section == HomeSection.NEWEST) AIRING_TTL else COLLECTION_TTL,
+            staleForMs = 0,
+            maxAgeMs = 2L * 60 * 60 * 1000,
+            forceRefresh = force,
+        ) {
+            when (section) {
+                HomeSection.NEWEST -> aniList.latestAired(page, adultHidden)
+                HomeSection.TRENDING -> aniList.collection("TRENDING_DESC", page = page, perPage = 30, hideAdult = adultHidden, spotlight = true)
+                HomeSection.POPULAR -> aniList.collection("POPULARITY_DESC", season = season, page = page, perPage = 30, hideAdult = adultHidden)
+                HomeSection.TOP_RATED -> aniList.collection("SCORE_DESC", page = page, perPage = 30, hideAdult = adultHidden)
+                HomeSection.MOVIES -> aniList.collection("POPULARITY_DESC", format = "MOVIE", page = page, perPage = 30, hideAdult = adultHidden)
+                HomeSection.UPCOMING -> aniList.collection("POPULARITY_DESC", status = "NOT_YET_RELEASED", page = page, perPage = 30, hideAdult = adultHidden)
+            }
+        }
+        return if (adultHidden) result.copy(items = result.items.filterNot { it.isAdult }) else result
+    }
+
+    /** Offline startup seed, read outside network timeouts; null if the snapshot is unreadable. */
     suspend fun offlineHomeCollections(): HomeCollections? {
         val offline = localCatalog.homeCollections()
         if (offline.popular.isEmpty()) return null
@@ -1269,8 +1285,8 @@ class MiruroRepository(
      * had no banner and AniZip had fanart for 8 — and TMDB last, whose search-and-match costs
      * several requests per title. Both live answers are cached for a week, failures are not.
      */
-    suspend fun heroBackdrop(media: Media): String? {
-        media.bannerImage?.let { return it }
+    suspend fun heroBackdrop(media: Media): String? = backgroundMetadataGate.withPermit {
+        media.bannerImage?.let { return@withPermit it }
         val published = try {
             konoha.heroBackdrops()[media.id]
         } catch (e: CancellationException) {
@@ -1279,11 +1295,11 @@ class MiruroRepository(
             DiagnosticsLog.throwable("Hero backdrops index failed", e)
             null
         }
-        published?.let { return it }
-        aniZip.fanart(media.id).firstOrNull()?.let { return it }
+        published?.let { return@withPermit it }
+        aniZip.fanart(media.id).firstOrNull()?.let { return@withPermit it }
         // The id map is an asset read on first use, so it stays off the caller's thread.
         val hint = withContext(Dispatchers.IO) { konoha.tmdbRefFor(media.id) }
-        return tmdb.backdrops(media, hint).firstOrNull()
+        tmdb.backdrops(media, hint).firstOrNull()
     }
 
     suspend fun discoverOptions(): DiscoverOptions {
@@ -2009,10 +2025,10 @@ class MiruroRepository(
      * the app's own type is a page; one that refused to open because a logo could not be fetched
      * is not, and every caller here has the title already.
      */
-    suspend fun seriesLogo(anilistId: Int): String? {
+    suspend fun seriesLogo(anilistId: Int): String? = backgroundMetadataGate.withPermit {
         // Catalogue-native entries (hanime) use negative ids and have no record in the tree.
-        if (anilistId < 0) return null
-        return runCatching { konoha.details(anilistId)?.images?.logo?.takeIf { it.isNotBlank() } }
+        if (anilistId < 0) return@withPermit null
+        runCatching { konoha.details(anilistId)?.images?.logo?.takeIf { it.isNotBlank() } }
             .onFailure(Throwable::rethrowIfCancellation)
             .getOrNull()
     }
@@ -2163,7 +2179,7 @@ class MiruroRepository(
     suspend fun animeSeries(root: Media): List<Media> {
         if (root.id <= 0) return listOf(root)
         val serializer = SeriesMembership.serializer()
-        val fetch: suspend (Int) -> Media? = { id -> seriesFetchGate.withPermit { animeInfo(id) } }
+        val fetch: suspend (Int) -> Media? = { id -> backgroundMetadataGate.withPermit { animeInfo(id) } }
         fun visible(members: List<Media>) = visibleSeriesMembers(root.id, members, hideAdult)
         cache.getIfFresh("$SERIES_CACHE_PREFIX${root.id}", serializer)?.takeIf {
             root.id in it.ids && it.ids.size <= MAX_SERIES_ENTRIES && it.ids.all { id -> id > 0 }
@@ -2881,11 +2897,9 @@ class MiruroRepository(
             setOf("CURRENT", "REPEATING", "PLANNING", "PAUSED", "COMPLETED", "DROPPED")
         /** Statuses whose AniList record can no longer change, so the tree's copy is as good. */
         val SETTLED_STATUSES = setOf("FINISHED", "CANCELLED")
-        const val SERIES_FETCH_CONCURRENCY = 2
         const val SCHEDULE_TTL = 15L * 60 * 1000
         /** Days of padding either side of a published month. Mirrors the generator's own constant. */
         const val SCHEDULE_PAD_DAYS = 7L
-        const val HOME_TTL = 30L * 60 * 1000
         /** MAL id → AniList media join; ids never remap, so a day is conservative. */
         const val MAL_MAP_TTL = 24L * 60 * 60 * 1000
         const val AIRING_TTL = 30L * 60 * 1000

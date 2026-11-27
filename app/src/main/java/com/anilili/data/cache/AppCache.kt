@@ -3,6 +3,7 @@ package com.anilili.data.cache
 import android.content.Context
 import android.system.Os
 import com.anilili.data.AppGraph
+import com.anilili.data.backgroundMetadataGate
 import com.anilili.data.device.hasConservativeMemoryBudget
 import com.anilili.diagnostics.DiagnosticsLog
 import java.io.BufferedInputStream
@@ -22,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -125,7 +127,10 @@ class AppCache(
             touch(cached, now)
             scope.launch {
                 try {
-                    refresh(key, serializer, ttlMs, false, cacheIf, ttlMsFor, outdated, null, fetch)
+                    // Detached stale refreshes share the visible enrichment budget.
+                    backgroundMetadataGate.withPermit {
+                        refresh(key, serializer, ttlMs, false, cacheIf, ttlMsFor, outdated, null, fetch)
+                    }
                 } catch (_: Exception) {
                     // The stale value remains available until its safety window closes.
                 }

@@ -10,6 +10,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anilili.data.AppGraph
+import com.anilili.data.backgroundMetadataGate
 import com.anilili.diagnostics.DiagnosticsLog
 import com.anilili.data.library.LibraryStore
 import com.anilili.data.library.UPCOMING_AIRING_DAYS
@@ -17,6 +18,7 @@ import com.anilili.data.library.UpcomingAiring
 import com.anilili.data.library.hideFromContinueUntilAired
 import com.anilili.data.library.returnsToContinueAt
 import com.anilili.data.model.HomeCollections
+import com.anilili.data.model.HomeSection
 import com.anilili.data.model.Media
 import com.anilili.data.recs.RecommendationRow
 import com.anilili.data.recs.Recommendations
@@ -35,42 +37,22 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.yield
+import kotlinx.coroutines.sync.withPermit
+import kotlin.coroutines.coroutineContext
 import java.time.LocalDate
-
-private const val HOME_LOAD_TIMEOUT_MS = 15_000L
 
 /** Long enough for a pull-to-refresh spinner to register as an answer rather than a flicker. */
 private const val MIN_REFRESH_INDICATOR_MS = 550L
 
-/**
- * Rows fetched longer ago than this are swapped for live ones behind the screen that drew them.
- * Younger rows are left alone, so reopening the app often does not spend a rate-limited AniList
- * request on each open.
- */
-private const val HOME_REVALIDATE_AFTER_MS = 2L * 60 * 60 * 1000
-
-/**
- * A pageable Home row.
- *
- * Every one of the six is a rail on both form factors now — the phone's catalogue tabs are gone,
- * and with them the reason this was ever split between a tab enum and a section enum.
- */
-enum class HomeSection {
-    NEWEST,
-    POPULAR,
-    TRENDING,
-    TOP_RATED,
-    MOVIES,
-    UPCOMING,
-}
-
+/** Cached seed plus independently loaded catalogue rails. */
 data class HomeData(
-    val spotlight: List<Media>,
-    val newest: List<Media>,
-    val popular: List<Media>,
-    val movies: List<Media>,
-    val topRated: List<Media>,
+    val spotlight: List<Media> = emptyList(),
+    val newest: List<Media> = emptyList(),
+    val popular: List<Media> = emptyList(),
+    val movies: List<Media> = emptyList(),
+    val topRated: List<Media> = emptyList(),
     val upcoming: List<Media> = emptyList(),
 ) {
     fun section(section: HomeSection): List<Media> = when (section) {
@@ -114,20 +96,12 @@ class HomeViewModel : ViewModel() {
     private val _personal = MutableStateFlow(PersonalRows())
     val personal = _personal.asStateFlow()
     private var personalJob: Job? = null
-    private var personalAt = 0L
+    private var personalRequestRows = emptySet<HomeRow>()
+    private val personalAt = mutableMapOf<HomeRow, Long>()
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing = _isRefreshing.asStateFlow()
     private var loadJob: Job? = null
     private var loadGeneration = 0
-
-    /** Per-section paging cursor. Rebuilt on every load so a refresh starts from page 1 again. */
-    private class Paging {
-        var page = 1
-        var loading = false
-        var hasMore = true
-    }
-
-    private val paging = HomeSection.entries.associateWith { Paging() }
 
     /** Sections with a page in flight, so a rail can show progress and a button can disable. */
     private val _loadingMore = MutableStateFlow<Set<HomeSection>>(emptySet())
@@ -136,6 +110,82 @@ class HomeViewModel : ViewModel() {
     /** Sections AniList says are exhausted, so the Load More control can retire itself. */
     private val _exhausted = MutableStateFlow<Set<HomeSection>>(emptySet())
     val exhausted = _exhausted.asStateFlow()
+
+    private val _settledRows = MutableStateFlow<Set<HomeRow>>(emptySet())
+    val settledRows = _settledRows.asStateFlow()
+    private var active = false
+    private var ready = false
+    private var layout = HomeLayout.default(AppGraph.isTv)
+    private var demandedRows = emptySet<HomeRow>()
+    private val rowFailures = mutableMapOf<HomeSection, Exception>()
+    private val rowLoader = HomeRowLoader(
+        scope = viewModelScope,
+        fetch = { section, page, force ->
+            kotlinx.coroutines.withTimeout(15_000) { repo.homePage(section, page, force) }
+        },
+        publish = { section, page, append ->
+            rowFailures.remove(section)
+            val current = (_state.value as? UiState.Success)?.data ?: HomeData()
+            val items = (if (append) current.section(section) + page.items else page.items).distinctBy { it.id }
+            _state.value = UiState.Success(current.withSection(section, items))
+            _settledRows.value += HomeRow.entries.filter { it.catalogSection == section }
+            _exhausted.value = if (page.hasNextPage) _exhausted.value - section else _exhausted.value + section
+        },
+        loading = {
+            _loadingMore.value = it
+            if (it.isEmpty() && rowFailures.isNotEmpty()) reportEmptyHomeFailure()
+        },
+        failed = { section, error ->
+            rowFailures[section] = error
+            _settledRows.value += HomeRow.entries.filter { it.catalogSection == section }
+            DiagnosticsLog.throwable("Home row failed section=${section.name}", error)
+        },
+        now = SystemClock::elapsedRealtime,
+    )
+
+    private fun reportEmptyHomeFailure() {
+        viewModelScope.launch {
+            yield() // Allow a viewport change to finish scheduling its replacement requests.
+            if (!active || !ready || _loadingMore.value.isNotEmpty() || personalJob?.isActive == true) return@launch
+            val current = (_state.value as? UiState.Success)?.data ?: return@launch
+            if (layout.visible.any { it.hasContent(current, _personal.value, LibraryStore.history.value.isNotEmpty()) }) return@launch
+            val failure = rowFailures.entries.firstOrNull { (section, _) ->
+                layout.visible.any { it in demandedRows && it.catalogSection == section }
+            }?.value ?: return@launch
+            _state.value = UiState.Error(failure.toFailure(AnililiError.HOME_LOAD_FAILED))
+        }
+    }
+
+    fun setLayout(layout: HomeLayout) {
+        this.layout = layout
+        requestVisibleRows()
+    }
+
+    fun setVisibleRows(rows: Set<HomeRow>) {
+        demandedRows = rows
+        requestVisibleRows()
+    }
+
+    fun setActive(active: Boolean) {
+        this.active = active
+        requestVisibleRows()
+        if (active) refreshContinueWatching() else {
+            upcomingJob?.cancel()
+            upcomingJob = null
+        }
+    }
+
+    private fun requestVisibleRows(force: Boolean = false) {
+        val demanded = if (active && ready) demandedRows.intersect(layout.visible.toSet()) else emptySet()
+        val sections = demanded.mapNotNull { it.catalogSection }.toSet()
+        rowLoader.allow(sections)
+        sections.forEach { rowLoader.request(it, force = force) }
+        if (personalRequestRows.any { it !in demanded } || demanded.none { it == HomeRow.FOR_YOU || it == HomeRow.BECAUSE }) {
+            personalJob?.cancel()
+            personalJob = null
+        }
+        loadPersonal(force)
+    }
 
     /**
      * The airing schedule from yesterday to a fortnight out, keyed by title: which episodes air, and
@@ -196,6 +246,8 @@ class HomeViewModel : ViewModel() {
      * underneath is one or two published month files, shared with the Schedule tab's cache.
      */
     fun refreshContinueWatching(force: Boolean = false) {
+        if (!active || HomeRow.CONTINUE !in layout.visible || LibraryStore.history.value.isEmpty() ||
+            !SettingsStore.hideAiringTomorrowFromContinue.value) return
         clock.value = nowSec()
         val today = LocalDate.now()
         // A viewer who has just pulled to refresh is asking for a live answer, so a read already on
@@ -212,6 +264,7 @@ class HomeViewModel : ViewModel() {
                     DiagnosticsLog.throwable("Continue Watching schedule read failed from=$from", it)
                 }
                 .getOrNull() ?: return@launch
+            coroutineContext.ensureActive()
             // Nothing is recorded until the read has landed, so a failure leaves the row judged
             // against whatever is already known rather than against an empty window that hides nothing.
             val byTitle = entries
@@ -231,15 +284,6 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    /**
-     * Bumped on every completed load so in-flight paging can tell it belongs to a previous
-     * catalog. Without it a Load More that started before a pull-to-refresh would finish
-     * afterwards and republish the pre-refresh list it had captured.
-     */
-    private var catalogGeneration = 0
-
-    private var revalidateJob: Job? = null
-
     /** Coming back to the app is "opening" it as far as the viewer can tell. */
     private val foregroundObserver = object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -252,7 +296,6 @@ class HomeViewModel : ViewModel() {
 
     init {
         load()
-        refreshContinueWatching()
         ProcessLifecycleOwner.get().lifecycle.addObserver(foregroundObserver)
         // Wake when the first hidden row's episode becomes watchable, and judge again then. Restarted
         // whenever anything it depends on changes, including its own wake-up, which arms the next.
@@ -282,7 +325,25 @@ class HomeViewModel : ViewModel() {
         // The account's list lands after Home on a fresh sign-in, and changes as the viewer rates
         // things elsewhere; either way the rows were computed from the old list.
         viewModelScope.launch {
-            TasteStore.ratings.drop(1).collect { if (_state.value is UiState.Success) loadPersonal(force = true) }
+            TasteStore.ratings.drop(1).collect {
+                personalJob?.cancel()
+                personalJob = null
+                personalAt.clear()
+                if (_state.value is UiState.Success) loadPersonal(force = true)
+            }
+        }
+        viewModelScope.launch {
+            combine(LibraryStore.history, SettingsStore.hideAiringTomorrowFromContinue) { history, hide ->
+                history.map { it.anilistId } to hide
+            }.collect { refreshContinueWatching() }
+        }
+        viewModelScope.launch {
+            SettingsStore.hideAdultContent.drop(1).collect {
+                _state.value = UiState.Loading
+                _personal.value = PersonalRows()
+                personalAt.clear()
+                load()
+            }
         }
     }
 
@@ -293,6 +354,14 @@ class HomeViewModel : ViewModel() {
     fun load(force: Boolean = false) {
         val generation = ++loadGeneration
         loadJob?.cancel()
+        personalJob?.cancel()
+        personalJob = null
+        if (force) personalAt.clear()
+        rowFailures.clear()
+        ready = false
+        rowLoader.allow(emptySet())
+        rowLoader.reset()
+        _settledRows.value = emptySet()
         loadJob = viewModelScope.launch {
             val operationId = DiagnosticsLog.newOperationId("home")
             DiagnosticsLog.event(
@@ -305,25 +374,10 @@ class HomeViewModel : ViewModel() {
             val startedAtMs = SystemClock.elapsedRealtime()
             if (force && _state.value is UiState.Success) _isRefreshing.value = true else _state.value = UiState.Loading
             try {
-                // The timeout covers the network attempt only. The offline fallback is asked for
-                // afterwards, outside it, because reading the bundled catalogue is slow enough on a
-                // cold start to consume the whole window on its own.
-                val remote = runCatching {
-                    withTimeoutOrNull(HOME_LOAD_TIMEOUT_MS) { repo.homeCollections(force) }
-                }
-                remote.exceptionOrNull()?.rethrowIfCancellation()
-                val collections = remote.getOrNull()
-                    ?: repo.offlineHomeCollections()?.also {
-                        DiagnosticsLog.event(
-                            "Home served from bundled catalogue: " +
-                                (remote.exceptionOrNull()?.message ?: "request timed out"),
-                        )
-                    }
-                    ?: remote.exceptionOrNull()?.let { throw it }
-                    ?: error("Home request timed out. Check the connection and try again.")
-                val data = collections.toHomeData()
-                catalogGeneration++
-                paging.values.forEach { it.page = 1; it.hasMore = true }
+                val data = (_state.value as? UiState.Success)?.data ?: runCatching {
+                    (repo.cachedHomeCollections() ?: repo.offlineHomeCollections())?.toHomeData()
+                }.onFailure { it.rethrowIfCancellation() }.getOrNull() ?: HomeData()
+                if (generation != loadGeneration) return@launch
                 _exhausted.value = emptySet()
                 _loadingMore.value = emptySet()
                 DiagnosticsLog.event(
@@ -342,12 +396,9 @@ class HomeViewModel : ViewModel() {
                     operationId = operationId,
                 )
                 _state.value = UiState.Success(data)
-                // What was just drawn is usually the cached copy — up to a week old, since stale
-                // rows are served while a refresh runs out of sight and that refresh never reaches
-                // the screen. Replace it with the live rows as soon as they arrive.
-                if (!force) launchRevalidation()
-                // After the catalogue rails, never before: they are what the screen is waiting on.
-                loadPersonal(force = force)
+                ready = true
+                requestVisibleRows(force)
+                rowLoader.awaitCurrent()
             } catch (e: Exception) {
                 e.rethrowIfCancellation()
                 // No separate DiagnosticsLog call: the report is written by toFailure, under the
@@ -368,7 +419,7 @@ class HomeViewModel : ViewModel() {
                     if (_isRefreshing.value && shown < MIN_REFRESH_INDICATOR_MS) {
                         withContext(NonCancellable) { delay(MIN_REFRESH_INDICATOR_MS - shown) }
                     }
-                    _isRefreshing.value = false
+                    if (generation == loadGeneration) _isRefreshing.value = false
                 }
                 // Settled either way. Optional startup work waits on this rather than a fixed
                 // delay, so it cannot land on top of the first screen still fetching.
@@ -386,48 +437,7 @@ class HomeViewModel : ViewModel() {
      * from queuing a page per frame.
      */
     fun loadMore(section: HomeSection) {
-        val cursor = paging.getValue(section)
-        if (cursor.loading || !cursor.hasMore) return
-        if (_state.value !is UiState.Success) return
-        cursor.loading = true
-        _loadingMore.value = _loadingMore.value + section
-
-        viewModelScope.launch {
-            val generation = catalogGeneration
-            try {
-                val nextPage = cursor.page + 1
-                val page = when (section) {
-                    HomeSection.POPULAR -> repo.popular(nextPage)
-                    HomeSection.NEWEST -> repo.recentlyReleased(nextPage)
-                    HomeSection.TRENDING -> repo.trending(nextPage)
-                    HomeSection.TOP_RATED -> repo.topRated(nextPage)
-                    HomeSection.MOVIES -> repo.movies(nextPage)
-                    HomeSection.UPCOMING -> repo.upcoming(nextPage)
-                }
-                // A refresh landed while this page was in flight; its results belong to a catalog
-                // that no longer exists, and appending them would resurrect the old list.
-                if (generation != catalogGeneration) return@launch
-                val current = (_state.value as? UiState.Success)?.data ?: return@launch
-
-                cursor.page = nextPage
-                // AniList tells us directly when a section runs out — no need to guess from an
-                // empty page, and no need to leave a button that can no longer do anything.
-                cursor.hasMore = page.hasNextPage && page.items.isNotEmpty()
-                if (!cursor.hasMore) _exhausted.value = _exhausted.value + section
-
-                if (page.items.isNotEmpty()) {
-                    val updatedList = (current.section(section) + page.items).distinctBy { it.id }
-                    _state.value = UiState.Success(current.withSection(section, updatedList))
-                }
-            } catch (e: Exception) {
-                e.rethrowIfCancellation()
-                // The page stays un-advanced, so the row remains live for another attempt.
-                DiagnosticsLog.throwable("Home load more failed section=${section.name}", e)
-            } finally {
-                cursor.loading = false
-                _loadingMore.value = _loadingMore.value - section
-            }
-        }
+        if (active && ready) rowLoader.request(section, append = true)
     }
 
     /**
@@ -447,8 +457,7 @@ class HomeViewModel : ViewModel() {
      */
     fun revalidate() {
         if (loadJob?.isActive == true) return // it revalidates when it lands
-        launchRevalidation()
-        loadPersonal()
+        requestVisibleRows()
     }
 
     /**
@@ -456,57 +465,45 @@ class HomeViewModel : ViewModel() {
      * top of Home, and an AniList hiccup should not make them blink out.
      */
     fun loadPersonal(force: Boolean = false) {
+        val requested = demandedRows.intersect(layout.visible.toSet()).intersect(setOf(HomeRow.FOR_YOU, HomeRow.BECAUSE))
+            .filter { row -> force || personalAt[row]?.let { SystemClock.elapsedRealtime() - it < PERSONAL_REFRESH_AFTER_MS } != true }.toSet()
+        if (!active || requested.isEmpty()) return
         if (personalJob?.isActive == true) return
-        if (!force && SystemClock.elapsedRealtime() - personalAt < PERSONAL_REFRESH_AFTER_MS && personalAt != 0L) return
+        personalRequestRows = requested
         personalJob = viewModelScope.launch {
-            val rows = runCatching {
-                val because = Recommendations.becauseYouWatched()
-                // A title the "Because" row already offers is not repeated in "For you": the
-                // favourite's neighbours score highly in both, and on the TV they sat one above the
-                // other (Delicious in Dungeon in each).
-                val inBecause = because?.items?.mapTo(HashSet()) { it.id }.orEmpty()
-                PersonalRows(
-                    forYou = Recommendations.forYou()?.items.orEmpty().filterNot { it.id in inBecause },
-                    because = because,
+            try {
+                val rows = runCatching {
+                    backgroundMetadataGate.withPermit {
+                        val because = if (HomeRow.BECAUSE in requested) Recommendations.becauseYouWatched() else _personal.value.because
+                        val inBecause = because?.items?.mapTo(HashSet()) { it.id }.orEmpty()
+                        PersonalRows(
+                            forYou = if (HomeRow.FOR_YOU in requested) Recommendations.forYou()?.items.orEmpty()
+                                .filterNot { it.id in inBecause } else _personal.value.forYou,
+                            because = because,
+                        )
+                    }
+                }.onFailure {
+                    it.rethrowIfCancellation()
+                    DiagnosticsLog.throwable("Home personal rows failed", it)
+                }.getOrNull().also {
+                    coroutineContext.ensureActive()
+                    _settledRows.value += requested
+                    requested.forEach { row -> personalAt[row] = SystemClock.elapsedRealtime() }
+                } ?: return@launch
+                DiagnosticsLog.event(
+                    "Home personal rows forYou=${rows.forYou.size} because=${rows.because?.seed?.id}:${rows.because?.items?.size ?: 0}",
                 )
-            }.onFailure {
-                it.rethrowIfCancellation()
-                DiagnosticsLog.throwable("Home personal rows failed", it)
-            }.getOrNull() ?: return@launch
-            personalAt = SystemClock.elapsedRealtime()
-            DiagnosticsLog.event(
-                "Home personal rows forYou=${rows.forYou.size} because=${rows.because?.seed?.id}:${rows.because?.items?.size ?: 0}",
-            )
-            _personal.value = rows
+                _personal.value = rows
+            } finally {
+                if (personalJob === coroutineContext[Job]) {
+                    personalJob = null
+                    if (coroutineContext[Job]?.isActive == true) loadPersonal()
+                    if (rowFailures.isNotEmpty()) reportEmptyHomeFailure()
+                }
+            }
         }
     }
 
-    private fun launchRevalidation() {
-        if (revalidateJob?.isActive == true) return
-        if (_state.value !is UiState.Success) return
-        revalidateJob = viewModelScope.launch {
-            val generation = loadGeneration
-            val live = runCatching {
-                withTimeoutOrNull(HOME_LOAD_TIMEOUT_MS) {
-                    repo.homeCollections(maxAgeMs = HOME_REVALIDATE_AFTER_MS)
-                }
-            }.onFailure(Throwable::rethrowIfCancellation).getOrNull() ?: return@launch
-            val current = (_state.value as? UiState.Success)?.data ?: return@launch
-            // A load or refresh started meanwhile owns the screen now.
-            if (generation != loadGeneration) return@launch
-            if (paging.values.any { it.page > 1 || it.loading }) return@launch
-            val data = live.toHomeData()
-            if (data == current) return@launch
-            catalogGeneration++
-            paging.values.forEach { it.page = 1; it.hasMore = true }
-            _exhausted.value = emptySet()
-            DiagnosticsLog.event(
-                "Home revalidated newest=${data.newest.size} " +
-                    "newestChanged=${data.newest.map(Media::id) != current.newest.map(Media::id)}",
-            )
-            _state.value = UiState.Success(data)
-        }
-    }
 }
 
 private fun HomeCollections.toHomeData() = HomeData(

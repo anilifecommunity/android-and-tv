@@ -14,6 +14,30 @@ import org.junit.Test
 
 class TvHomeFocusPolicyTest {
     @Test
+    fun savedIdentitySurvivesAppendAndReorderAndMissingItemsFallBackSafely() {
+        assertEquals(1, rememberedTvRailIndex(listOf(11, 22, 33, 44), 22))
+        assertEquals(2, rememberedTvRailIndex(listOf(44, 33, 22, 11), 22))
+        assertEquals(0, rememberedTvRailIndex(listOf(11, 33), 22))
+        assertEquals(0, rememberedTvRailIndex(emptyList(), 22))
+        assertEquals(0, rememberedTvRailIndex(listOf(11), null))
+    }
+
+    @Test
+    fun retainedTargetsFollowIdentityAndReleaseRemovedCards() {
+        val cache = mutableMapOf<Int, TvFocusTarget>()
+        val first = reconcileTvRailTargets(listOf(11, 22), cache)
+        first[1].onAttach()
+        val appended = reconcileTvRailTargets(listOf(11, 22, 33), cache)
+        assertSame(first[1], appended[1])
+        val reordered = reconcileTvRailTargets(listOf(33, 22), cache)
+        assertSame(first[1], reordered[1])
+        assertEquals(setOf(22, 33), cache.keys)
+        assertSame(first[1].requester, rememberedTvRailRequester(reordered, 1))
+        reconcileTvRailTargets(emptyList(), cache)
+        assertEquals(0, cache.size)
+    }
+
+    @Test
     fun catalogRailsUsePortraitCoverArtwork() {
         val media = Media(
             id = 1,

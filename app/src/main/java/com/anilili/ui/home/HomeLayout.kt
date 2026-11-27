@@ -1,5 +1,7 @@
 package com.anilili.ui.home
 
+import com.anilili.data.model.HomeSection
+
 /**
  * One row Home can draw. [key] is what is stored, so it must never change once shipped; the
  * enum's own name and order are free to.
@@ -34,6 +36,13 @@ val HomeRow.catalogSection: HomeSection?
         HomeRow.UPCOMING -> HomeSection.UPCOMING
         HomeRow.CONTINUE, HomeRow.FOR_YOU, HomeRow.BECAUSE -> null
     }
+
+internal fun HomeRow.hasContent(data: HomeData, personal: PersonalRows, hasHistory: Boolean): Boolean = when (this) {
+    HomeRow.CONTINUE -> hasHistory
+    HomeRow.FOR_YOU -> personal.forYou.isNotEmpty()
+    HomeRow.BECAUSE -> personal.because?.let { it.seed != null && it.items.isNotEmpty() } == true
+    else -> catalogSection?.let { data.section(it).isNotEmpty() } == true
+}
 
 /**
  * The viewer's Home: which rows, in what order.

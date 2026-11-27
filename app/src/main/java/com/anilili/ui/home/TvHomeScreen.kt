@@ -2,6 +2,8 @@
 
 package com.anilili.ui.home
 
+import com.anilili.data.model.HomeSection
+
 import com.anilili.ui.theme.appCanvasFade
 import com.anilili.ui.theme.hasAppBackdrop
 import com.anilili.ui.theme.appCanvas
@@ -66,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -129,6 +132,7 @@ import com.anilili.data.AppGraph
 import com.anilili.diagnostics.DiagnosticsLog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import com.anilili.util.cached
@@ -179,6 +183,8 @@ internal fun TvHomeContent(
     onOpenDetails: (HistoryEntry) -> Unit,
     loadingMore: Set<HomeSection> = emptySet(),
     onLoadMore: (HomeSection) -> Unit = {},
+    settledRows: Set<HomeRow> = HomeRow.entries.toSet(),
+    onVisibleRows: (Set<HomeRow>) -> Unit = {},
     primaryActionFocusTarget: TvFocusTarget? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -208,16 +214,17 @@ internal fun TvHomeContent(
     val because = personal.because?.takeIf { it.seed != null && it.items.isNotEmpty() }
     // The rails actually drawn, in the viewer's order. The first hands Up back to the hero; the
     // last blocks Down, which otherwise finds nothing below and drops the cursor off the screen.
-    val rails = layout.present { row ->
-        when (row) {
-            HomeRow.CONTINUE -> history.isNotEmpty()
-            HomeRow.FOR_YOU -> personal.forYou.isNotEmpty()
-            HomeRow.BECAUSE -> because != null
-            else -> row.catalogSection?.let { data.section(it).isNotEmpty() } == true
+    val rowsWithContent = remember(layout, history.isNotEmpty(), personal, data) {
+        layout.present { row ->
+            row.hasContent(data, personal, history.isNotEmpty())
         }
     }
-    val firstRail = rails.firstOrNull()
-    val lastRail = rails.lastOrNull()
+    val rails = remember(layout, rowsWithContent, settledRows) {
+        layout.visible.filter { it in rowsWithContent || it != HomeRow.CONTINUE && it !in settledRows }
+    }
+    val firstRail = rowsWithContent.firstOrNull()
+    val lastRail = rowsWithContent.lastOrNull()
+    ObserveHomeViewport(listState, rails, onVisibleRows)
 
     // What's new (ui/tour): starts once Home has settled. A row a step points at is scrolled to just
     // under the floating bar; the dice and Settings live in that bar, which shows at the top.
@@ -256,46 +263,27 @@ internal fun TvHomeContent(
         }
     }
 
-    // Landscape pictures for the titles AniList has no banner for, by id; a null is "looked, none",
-    // and the poster treatment stays. The spotlight's are fetched up front, one at a time, so a
-    // slide never arrives as a poster and turns into a backdrop a moment later. A rail card's is
-    // asked for only once focus has rested on it: holding Right across a rail would otherwise be a
-    // burst of lookups against a keyless service, for previews nobody stopped to look at.
+    // Resolve only the displayed hero; changing focus cancels its pending dwell and request.
     val heroBackdrops = remember { mutableStateMapOf<Int, String?>() }
-    LaunchedEffect(spotlight.map(Media::id)) {
-        spotlight
-            .filter { it.wideHeroArtwork() == null && it.id !in heroBackdrops }
-            .forEach { heroBackdrops[it.id] = AppGraph.repository.heroBackdrop(it) }
-    }
-    LaunchedEffect(railPreview?.id) {
-        val preview = railPreview ?: return@LaunchedEffect
-        if (preview.wideHeroArtwork() != null || preview.id in heroBackdrops) return@LaunchedEffect
-        delay(TV_HERO_BACKDROP_SETTLE_MS)
-        heroBackdrops[preview.id] = AppGraph.repository.heroBackdrop(preview)
+    LaunchedEffect(hero?.id) {
+        val current = hero ?: return@LaunchedEffect
+        if (current.wideHeroArtwork() != null || current.id in heroBackdrops) return@LaunchedEffect
+        if (railPreview != null) delay(TV_HERO_BACKDROP_SETTLE_MS)
+        heroBackdrops[current.id] = AppGraph.repository.heroBackdrop(current)
     }
 
-    // The series' logos, set in place of the typed title as the title page and the desktop app's
-    // spotlight already do. Looked up the same way as the backdrops — the spotlight's up front so
-    // a slide does not swap its text for art while it is being read, a rail card's once focus has
-    // rested on it — but on their own effects, so a slow backdrop never holds a logo back. A null
-    // is "looked, none", and the typed title stays. Nothing is asked while logos are switched off.
     val showSeriesLogos by SettingsStore.showSeriesLogos.collectAsState()
     val heroLogos = remember { mutableStateMapOf<Int, String?>() }
-    LaunchedEffect(spotlight.map(Media::id), showSeriesLogos) {
-        if (!showSeriesLogos) return@LaunchedEffect
-        spotlight
-            .filter { it.id !in heroLogos }
-            .forEach { heroLogos[it.id] = AppGraph.repository.seriesLogo(it.id) }
-    }
-    LaunchedEffect(railPreview?.id, showSeriesLogos) {
-        val preview = railPreview ?: return@LaunchedEffect
-        if (!showSeriesLogos || preview.id in heroLogos) return@LaunchedEffect
-        delay(TV_HERO_BACKDROP_SETTLE_MS)
-        heroLogos[preview.id] = AppGraph.repository.seriesLogo(preview.id)
+    LaunchedEffect(hero?.id, showSeriesLogos) {
+        val current = hero ?: return@LaunchedEffect
+        if (!showSeriesLogos || current.id in heroLogos) return@LaunchedEffect
+        if (railPreview != null) delay(TV_HERO_BACKDROP_SETTLE_MS)
+        heroLogos[current.id] = AppGraph.repository.seriesLogo(current.id)
     }
 
-    LaunchedEffect(spotlight.map(Media::id), spotlightIndex, heroHasFocus, railPreview) {
-        if (spotlight.size <= 1 || heroHasFocus || railPreview != null) return@LaunchedEffect
+    val lowCostEffects = LocalAppDeviceProfile.current.useLowCostTvEffects
+    LaunchedEffect(spotlight.map(Media::id), spotlightIndex, heroHasFocus, railPreview, lowCostEffects) {
+        if (lowCostEffects || spotlight.size <= 1 || heroHasFocus || railPreview != null) return@LaunchedEffect
         delay(TV_HERO_AUTO_ADVANCE_MS)
         spotlightIndex = nextHeroPage(spotlightIndex, spotlight.size)
     }
@@ -330,11 +318,11 @@ internal fun TvHomeContent(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             if (hero != null) {
-                item(key = "tv-hero") {
+                item(key = "hero") {
                     TvHero(
                         media = hero,
                         backdrop = hero.wideHeroArtwork() ?: heroBackdrops[hero.id],
-                        logo = heroLogos[hero.id],
+                        logo = heroLogos[hero.id].takeIf { showSeriesLogos },
                         pageIndex = spotlightIndex,
                         pageCount = spotlight.size,
                         onAnimeClick = onAnimeClick,
@@ -349,11 +337,15 @@ internal fun TvHomeContent(
                 }
             }
             rails.forEach { row ->
+                if (row !in rowsWithContent) {
+                    item(key = row.key) { PendingHomeRow(row, isTv = true) }
+                    return@forEach
+                }
                 // Up from the top rail belongs to the hero; from any other, to the rail above.
-                val onFocusUp = returnToHero.takeIf { row == firstRail }
+                val onFocusUp = returnToHero.takeIf { row == firstRail && hero != null }
                 val blockDown = row == lastRail
                 when (row) {
-                    HomeRow.CONTINUE -> item(key = "continue-watching") {
+                    HomeRow.CONTINUE -> item(key = row.key) {
                         TvContinueRail(
                             history = history.take(12),
                             onResume = onResume,
@@ -362,7 +354,7 @@ internal fun TvHomeContent(
                             onFocusUp = onFocusUp,
                         )
                     }
-                    HomeRow.FOR_YOU -> item(key = "for-you") {
+                    HomeRow.FOR_YOU -> item(key = row.key) {
                         Box(Modifier.tourTarget(TourTarget.FOR_YOU)) {
                             TvMediaRail(
                                 title = row.label(isTv = true),
@@ -374,7 +366,7 @@ internal fun TvHomeContent(
                             )
                         }
                     }
-                    HomeRow.BECAUSE -> item(key = "because-${because?.seed?.id}") {
+                    HomeRow.BECAUSE -> item(key = row.key) {
                         Box(Modifier.tourTarget(TourTarget.BECAUSE)) {
                             TvMediaRail(
                                 title = "Because you watched ${because?.seed?.title?.preferred}",
@@ -752,16 +744,13 @@ private fun TvMediaRail(
     onLoadMore: (() -> Unit)? = null,
     onFocusUp: (() -> Boolean)? = null,
 ) {
-    // Keyed on the head of the list rather than on all of it, because [onLoadMore] appends to the
-    // tail while the viewer is somewhere inside: keying on every id would rebuild the remembered
-    // index on arrival of each page and send the next Up-and-back-down all the way to card one.
-    // The targets do have to follow the length — indexing past the end of a stale list is a crash
-    // rather than a misplaced cursor — and swapping a card's target is free, the focus lives on
-    // the node.
-    val railIdentity = media.firstOrNull()?.id
-    var lastFocusedIndex by remember(railIdentity) { mutableIntStateOf(0) }
-    val itemFocusTargets = remember(railIdentity, media.size) { List(media.size) { TvFocusTarget() } }
+    // Save identity across navigation and retain each target across append/reorder.
+    val mediaIds = remember(media) { media.map(Media::id) }
+    var lastFocusedId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val lastFocusedIndex = rememberedTvRailIndex(mediaIds, lastFocusedId)
+    val itemFocusTargets = rememberTvRailTargets(mediaIds)
     val railState = rememberTvRailState()
+    RestoreTvRailPosition(railState, mediaIds, lastFocusedId)
 
     if (onLoadMore != null) {
         // Asked for while there is still most of a screenful to travel, so the page is usually
@@ -808,7 +797,7 @@ private fun TvMediaRail(
                         onClick = { onAnimeClick(item.id) },
                         onFocused = { focused ->
                             if (focused) {
-                                lastFocusedIndex = index
+                                lastFocusedId = item.id
                                 onPreview(item)
                             }
                         },
@@ -1050,18 +1039,21 @@ internal fun TvContinueRail(
         )
     }
 
-    val historyIds = history.map(HistoryEntry::anilistId)
-    var lastFocusedIndex by remember(historyIds) { mutableIntStateOf(0) }
-    val itemFocusTargets = remember(historyIds) { List(history.size) { TvFocusTarget() } }
+    val historyIds = remember(history) { history.map(HistoryEntry::anilistId) }
+    var lastFocusedId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val lastFocusedIndex = rememberedTvRailIndex(historyIds, lastFocusedId)
+    val itemFocusTargets = rememberTvRailTargets(historyIds)
     // Each card's info button: Up from a card goes there before it leaves the rail.
-    val actionRequesters = remember(historyIds) { List(history.size) { FocusRequester() } }
+    val actionTargets = rememberTvRailTargets(historyIds)
+    val railState = rememberContinueRailState(history.firstOrNull()?.anilistId, rememberTvRailState())
+    RestoreTvRailPosition(railState, historyIds, lastFocusedId)
     var actionsFocused by remember { mutableStateOf(false) }
 
     TvRailScrollSpec {
         Column {
             if (title != null) TvRailTitle(title)
             LazyRow(
-                state = rememberContinueRailState(history.firstOrNull()?.anilistId, rememberTvRailState()),
+                state = railState,
                 modifier = Modifier
                     .onPreviewKeyEvent { event ->
                         val leavingUpwards = event.type == KeyEventType.KeyDown &&
@@ -1070,8 +1062,9 @@ internal fun TvContinueRail(
                         // A card's corner buttons sit above its text, so Up is the way into them:
                         // Left and Right stay one press per card. Up again leaves the rail.
                         if (!actionsFocused) {
+                            val target = actionTargets.getOrNull(lastFocusedIndex) ?: return@onPreviewKeyEvent false
                             val moved = runCatching {
-                                actionRequesters[lastFocusedIndex].requestFocus()
+                                target.requester.requestFocus()
                             }.isSuccess
                             if (moved) return@onPreviewKeyEvent true
                         }
@@ -1093,10 +1086,10 @@ internal fun TvContinueRail(
                         onLongClick = { managedEntry = entry },
                         onOpenDetails = { onOpenDetails(entry) },
                         onRemove = { LibraryStore.removeHistory(entry.anilistId, dismissRemoteSeed = true) },
-                        actionsRequester = actionRequesters[index],
+                        actionsRequester = actionTargets[index].requester,
                         cardRequester = itemFocusTargets[index].requester,
                         onActionsFocused = { focused -> actionsFocused = focused },
-                        onFocused = { focused -> if (focused) lastFocusedIndex = index },
+                        onFocused = { focused -> if (focused) lastFocusedId = entry.anilistId },
                         modifier = Modifier
                             .tvFocusTarget(itemFocusTargets[index])
                             .then(
@@ -1411,20 +1404,36 @@ private fun tvFormatLabel(format: String): String = when (format) {
     else -> format.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }
 }
 
-/**
- * Which card a rail hands focus to when focus enters it travelling in [direction].
- *
- * Up and Down give the press straight back to the spatial search, so the cursor lands on the card
- * the viewer is looking at — the one directly above or below the card they are leaving. Restoring
- * the remembered card on a vertical press moved the cursor sideways as well: from the fourth card
- * of a rail, Down landed on the *first* card of the next one, because that rail had last been left
- * at its start. Two rails at different scroll offsets then had no path between them that a viewer
- * could predict, and walking down the page drifted back to the left edge on every row.
- *
- * Every other way in keeps the remembered card, because those arrivals carry no column to align
- * to: the top bar handing Home's content back, or a return from a title's page. There the card the
- * viewer last had is the only answer, and landing on it is what makes Back feel like a step back.
- */
+@Composable
+private fun rememberTvRailTargets(ids: List<Int>): List<TvFocusTarget> {
+    val targets = remember { mutableMapOf<Int, TvFocusTarget>() }
+    return remember(ids) { reconcileTvRailTargets(ids, targets) }
+}
+
+internal fun reconcileTvRailTargets(ids: List<Int>, targets: MutableMap<Int, TvFocusTarget>): List<TvFocusTarget> {
+    targets.keys.retainAll(ids.toSet())
+    return ids.map { targets.getOrPut(it) { TvFocusTarget() } }
+}
+
+internal fun rememberedTvRailIndex(ids: List<Int>, focusedId: Int?): Int =
+    ids.indexOfFirst { it == focusedId }.coerceAtLeast(0)
+
+@Composable
+private fun RestoreTvRailPosition(state: LazyListState, ids: List<Int>, focusedId: Int?) {
+    val latestId by rememberUpdatedState(focusedId)
+    LaunchedEffect(state, ids) {
+        if (latestId == null || latestId !in ids) return@LaunchedEffect
+        snapshotFlow { state.layoutInfo.visibleItemsInfo.isNotEmpty() }.first { it }
+        val current = latestId ?: return@LaunchedEffect
+        if (current !in ids) return@LaunchedEffect
+        val index = rememberedTvRailIndex(ids, current)
+        if (!state.isScrollInProgress && state.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+            state.scrollToItem(index)
+        }
+    }
+}
+
+/** Vertical entry aligns columns; route return restores the remembered attached card. */
 internal fun tvRailEnterRequester(
     direction: FocusDirection,
     targets: List<TvFocusTarget>,

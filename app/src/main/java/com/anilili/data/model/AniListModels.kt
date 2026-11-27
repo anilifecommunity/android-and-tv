@@ -340,18 +340,7 @@ data class HomeCollections(
     val upcoming: List<Media> = emptyList(),
 )
 
-@Serializable
-data class HomeCollectionsData(
-    val spotlight: Page? = null,
-    val newest: SchedulePage? = null,
-    val popular: Page? = null,
-    val movies: Page? = null,
-    val topRated: Page? = null,
-    val upcoming: Page? = null,
-)
-
-@Serializable
-data class GqlHomeCollectionsResponse(val data: HomeCollectionsData? = null)
+enum class HomeSection { NEWEST, POPULAR, TRENDING, TOP_RATED, MOVIES, UPCOMING }
 
 @Serializable
 data class GqlMediaResponse(val data: MediaData? = null)

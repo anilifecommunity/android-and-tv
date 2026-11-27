@@ -2,6 +2,7 @@ package com.anilili.data.remote
 
 import com.anilili.data.cache.AppCache
 import com.anilili.diagnostics.DiagnosticsLog
+import com.anilili.ui.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -39,16 +40,16 @@ class AniZipClient(
                 ttlMs = FANART_TTL_MS,
             ) { fetchFanart(anilistId) }
         }
-            .onFailure { DiagnosticsLog.throwable("AniZip fanart failed id=$anilistId", it) }
+            .onFailure { it.rethrowIfCancellation(); DiagnosticsLog.throwable("AniZip fanart failed id=$anilistId", it) }
             .getOrDefault(emptyList())
     }
 
-    private fun fetchFanart(anilistId: Int): List<String> {
+    private suspend fun fetchFanart(anilistId: Int): List<String> {
         val request = Request.Builder()
             .url("$API_BASE/mappings?anilist_id=$anilistId")
             .header("Accept", "application/json")
             .build()
-        return client.newCall(request).execute().use { response ->
+        return client.newCall(request).readCancellable { response ->
             when {
                 response.code == 404 -> emptyList()
                 !response.isSuccessful -> error("AniZip HTTP ${response.code}")
