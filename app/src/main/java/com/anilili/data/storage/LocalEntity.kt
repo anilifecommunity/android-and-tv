@@ -7,7 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 
 internal enum class LocalCollection(val table: String, val fields: Set<String>, val portable: Boolean = true) {
-    LIBRARY("library_items", setOf("ref", "title", "poster", "isAdult", "savedAt", "watchedAt", "status", "score", "currentUnitId", "updatedAt")),
+    LIBRARY("library_items", setOf("ref", "title", "poster", "isAdult", "savedAt", "watchedAt", "status", "score", "currentUnitId", "updatedAt", "legacyWatchedBefore")),
     PROGRESS("unit_progress", setOf("ref", "unitId", "displayOrdinal", "sourceOrdinal", "sourceSeason", "absoluteOrdinal", "positionMs", "durationMs", "completed", "readingPage", "readingFraction", "textOffset", "sectionId", "updatedAt")),
     LIST("custom_lists", setOf("id", "name", "createdAt", "updatedAt")),
     GROUP("groups", setOf("id", "name", "coverMode", "coverAssetId", "createdAt", "updatedAt")),
@@ -46,7 +46,8 @@ internal data class LocalEntity(val collection: LocalCollection, val value: Json
         for (field in setOf("poster", "status", "currentUnitId", "displayOrdinal", "absoluteOrdinal", "sourceOrdinal", "sectionId", "coverMode", "coverAssetId")) {
             value[field]?.takeUnless { it == JsonNull }?.let { require(it.jsonPrimitive.isString && it.jsonPrimitive.content.length <= 2048) }
         }
-        for (field in setOf("displayOrdinal", "absoluteOrdinal")) value[field]?.takeUnless { it == JsonNull }?.let {
+        for (field in setOf("displayOrdinal", "absoluteOrdinal", "legacyWatchedBefore")) value[field]?.takeUnless { it == JsonNull }?.let {
+            require(it.jsonPrimitive.isString)
             require(it.jsonPrimitive.content.length <= 64 && Regex("-?[0-9]+(?:\\.[0-9]+)?").matches(it.jsonPrimitive.content))
         }
         value["sourceOrdinal"]?.takeUnless { it == JsonNull }?.let { require(it.jsonPrimitive.content.length <= 128) }
@@ -67,9 +68,9 @@ internal data class LocalEntity(val collection: LocalCollection, val value: Json
     fun portableValue(): JsonObject {
         require(collection.portable)
         val portable = value.filter { (field, payload) ->
-            field != "poster" || payload == JsonNull || runCatching {
+            field != "legacyWatchedBefore" && (field != "poster" || payload == JsonNull || runCatching {
                 URI(payload.jsonPrimitive.content).let { it.scheme == "https" && it.host != null && it.userInfo == null }
-            }.getOrDefault(false)
+            }.getOrDefault(false))
         }
         if (ref == null) return JsonObject(portable)
         // A cloud reference retains the canonical/source identity; secondary tracker evidence stays local.
