@@ -119,6 +119,23 @@ class LegacyMediaImportTest {
         assertTrue(database.importLegacyProfile("local-one", source))
     }
 
+    @Test fun `compact range corrections and inferred resume clocks keep their actual watched state`() = runBlocking<Unit> {
+        val compact = history.copy(inferredWatchedBefore = 1_000_000_001.0, watchedEpisodes = emptySet(),
+            unwatchedEpisodes = setOf(2.0, 7.0), resumePoints = mapOf("1" to EpisodeResume(100, 200), "2" to EpisodeResume(50, 100)))
+        database.importLegacyProfile("local-one", LegacyMediaSnapshot(mapOf("history" to storageJson.encodeToString(listOf(compact)))))
+        database.transaction("local-one") {
+            val library = entities(LocalCollection.LIBRARY).single()
+            assertEquals(JsonPrimitive("1000000001"), library.value["legacyWatchedBefore"])
+            val progress = entities(LocalCollection.PROGRESS).associateBy { it.value.getValue("unitId").jsonPrimitive.content }
+            assertTrue(progress.getValue("legacy-episode:1").value.getValue("completed").jsonPrimitive.boolean)
+            assertFalse(progress.getValue("legacy-episode:2").value.getValue("completed").jsonPrimitive.boolean)
+            assertEquals(JsonPrimitive(50L), progress.getValue("legacy-episode:2").value["positionMs"])
+            assertFalse(progress.getValue("legacy-episode:7").value.getValue("completed").jsonPrimitive.boolean)
+            assertEquals(4, progress.size)
+            assertFalse("legacyWatchedBefore" in library.portableValue())
+        }
+    }
+
     @Test fun `migration cannot adopt a bound account or overwrite unrelated guest rows`() = runBlocking<Unit> {
         val binding = CloudBinding("account-one", "remote-one")
         database.transaction("local-one") { activateBinding(binding) }

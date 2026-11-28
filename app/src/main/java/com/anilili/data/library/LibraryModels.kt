@@ -68,7 +68,52 @@ data class HistoryEntry(
      * this to the handful of episodes actually abandoned midway.
      */
     val resumePoints: Map<String, EpisodeResume> = emptyMap(),
+    /** Compact legacy/tracker inference: positive whole episodes strictly below this boundary. */
+    val inferredWatchedBefore: Double? = null,
+    /** Explicit corrections to the inferred range; a later explicit watched mark takes priority. */
+    val unwatchedEpisodes: Set<Double> = emptySet(),
 ) {
+    init { require(inferredWatchedBefore == null || inferredWatchedBefore.isFinite() && inferredWatchedBefore > 1) }
+
+    private fun inferred(number: Double): Boolean = number >= 1 && number % 1.0 == 0.0 &&
+        inferredWatchedBefore?.let { number < it } == true
+
+    fun isEpisodeWatched(number: Double): Boolean = number in watchedEpisodes ||
+        inferred(number) && number !in unwatchedEpisodes
+
+    val watchedEpisodeCount: Int get() {
+        if (inferredWatchedBefore == null) return watchedEpisodes.size
+        val base = inferredWatchedBefore?.let { kotlin.math.ceil(it) - 1 } ?: 0.0
+        val corrected = unwatchedEpisodes.count { inferred(it) && it !in watchedEpisodes }
+        val explicit = watchedEpisodes.count { !inferred(it) }
+        return (base - corrected + explicit).coerceIn(0.0, Int.MAX_VALUE.toDouble()).toInt()
+    }
+
+    fun furthestWatchedEpisode(): Double? {
+        var last = inferredWatchedBefore?.let { if (it <= 9_007_199_254_740_992.0) kotlin.math.ceil(it) - 1 else Math.nextAfter(it, Double.NEGATIVE_INFINITY) } ?: 0.0
+        while (last >= 1 && last in unwatchedEpisodes && last !in watchedEpisodes) {
+            last = if (last <= 9_007_199_254_740_992.0) last - 1 else Math.nextAfter(last, Double.NEGATIVE_INFINITY)
+        }
+        return listOfNotNull(last.takeIf { it >= 1 }, watchedEpisodes.maxOrNull()).maxOrNull()
+    }
+
+    fun hasWatchedEveryEpisodeThrough(total: Int): Boolean {
+        if (total < 1) return false
+        val base = (inferredWatchedBefore?.let { kotlin.math.ceil(it) - 1 } ?: 0.0).coerceIn(0.0, total.toDouble()).toInt()
+        val corrected = unwatchedEpisodes.count { it >= 1 && it <= base && it % 1.0 == 0.0 && it !in watchedEpisodes }
+        val extra = watchedEpisodes.count { it > base && it <= total && it % 1.0 == 0.0 }
+        return base - corrected + extra == total
+    }
+
+    internal fun withWatchedThrough(progress: Int): HistoryEntry {
+        if (progress < 1) return this
+        val corrections = unwatchedEpisodes.filterNot { it >= 1 && it <= progress && it % 1.0 == 0.0 }.toSet()
+        // Preserve existing small v1 sets; large imported counts must never allocate per episode.
+        return if (progress <= MAX_EXPLICIT_INFERRED_EPISODES && inferredWatchedBefore == null) {
+            copy(watchedEpisodes = watchedEpisodes + (1..progress).map(Int::toDouble), unwatchedEpisodes = corrections)
+        } else copy(inferredWatchedBefore = maxOf(inferredWatchedBefore ?: 0.0, progress.toDouble() + 1), unwatchedEpisodes = corrections)
+    }
+
     val progressFraction: Float
         get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
 
@@ -86,7 +131,7 @@ data class HistoryEntry(
  * point at, so that pair is the fallback — upgrading keeps the position the viewer left behind.
  */
 fun HistoryEntry.resumeFor(episodeNumber: Double): EpisodeResume? {
-    if (episodeNumber in watchedEpisodes) return null
+    if (isEpisodeWatched(episodeNumber)) return null
     resumePoints[episodeKey(episodeNumber)]?.let { stored ->
         return stored.takeIf { it.positionMs > 0 }
     }
@@ -105,7 +150,7 @@ internal fun HistoryEntry.withEpisodeProgress(
     positionMs: Long,
     durationMs: Long,
 ): HistoryEntry {
-    if (episodeNumber in watchedEpisodes) return this
+    if (isEpisodeWatched(episodeNumber)) return this
     val key = episodeKey(episodeNumber)
     val points = if (positionMs <= 0) {
         resumePoints - key
@@ -187,7 +232,7 @@ internal fun historyAfterEpisodeWatched(
     val points = existing.resumePoints - episodeKey(watchedEpisode)
     if (seriesCompleted) return null
     val next = nextEpisode?.takeIf { it > watchedEpisode }
-        ?: return existing.copy(watchedEpisodes = watched, resumePoints = points)
+        ?: return existing.copy(watchedEpisodes = watched, resumePoints = points, unwatchedEpisodes = existing.unwatchedEpisodes - watchedEpisode)
     // The episode being moved to may itself have been left partway earlier; the row's own clock is
     // what draws its progress bar, so it has to say the same thing the resume point does.
     val resume = points[episodeKey(next)]
@@ -198,6 +243,7 @@ internal fun historyAfterEpisodeWatched(
         durationMs = resume?.durationMs ?: 0,
         fromRemote = false,
         watchedEpisodes = watched,
+        unwatchedEpisodes = existing.unwatchedEpisodes - watchedEpisode,
         resumePoints = points,
     )
 }
@@ -232,16 +278,16 @@ internal fun historyAfterEpisodeToggled(
     watched: Boolean,
     airedEpisodes: List<EpisodeStop> = emptyList(),
 ): HistoryEntry? {
-    val isWatched = episodeNumber in existing.watchedEpisodes
+    val isWatched = existing.isEpisodeWatched(episodeNumber)
     if (watched == isWatched) return null
     val stops = airedEpisodes.sortedBy(EpisodeStop::number)
     return if (watched) {
         val marked = existing.watchedEpisodes + episodeNumber
         val points = existing.resumePoints - episodeKey(episodeNumber)
-        val recorded = existing.copy(watchedEpisodes = marked, resumePoints = points)
+        val recorded = existing.copy(watchedEpisodes = marked, resumePoints = points, unwatchedEpisodes = existing.unwatchedEpisodes - episodeNumber)
         when {
             stops.isNotEmpty() && episodeNumber >= existing.episodeNumber -> {
-                val target = stops.firstOrNull { it.number > episodeNumber && it.number !in marked }
+                val target = stops.firstOrNull { it.number > episodeNumber && !recorded.isEpisodeWatched(it.number) }
                     ?: stops.firstOrNull { it.number == episodeNumber }
                     ?: EpisodeStop(episodeNumber)
                 recorded.onEpisode(target)
@@ -251,7 +297,9 @@ internal fun historyAfterEpisodeToggled(
             else -> recorded
         }
     } else {
-        val unmarked = existing.copy(watchedEpisodes = existing.watchedEpisodes - episodeNumber)
+        val unmarked = existing.copy(watchedEpisodes = existing.watchedEpisodes - episodeNumber,
+            unwatchedEpisodes = if (existing.inferredWatchedBefore?.let { episodeNumber >= 1 && episodeNumber % 1.0 == 0.0 && episodeNumber < it } == true)
+                existing.unwatchedEpisodes + episodeNumber else existing.unwatchedEpisodes)
         val rowWasMovedPastIt = stops.isNotEmpty() &&
             episodeNumber < existing.episodeNumber &&
             existing.positionMs == 0L &&
@@ -268,7 +316,7 @@ internal fun historyAfterEpisodeToggled(
 
 /** This row pointed at [stop], with that episode's own clock if it was left part-way. */
 private fun HistoryEntry.onEpisode(stop: EpisodeStop): HistoryEntry {
-    if (stop.number == episodeNumber && stop.number in watchedEpisodes) {
+    if (stop.number == episodeNumber && isEpisodeWatched(stop.number)) {
         return copy(positionMs = 0, durationMs = 0)
     }
     if (stop.number == episodeNumber) return this
@@ -323,9 +371,7 @@ internal fun historyAfterRemoteProgress(
     val target = remoteRowEpisode(remoteProgress, totalEpisodes, airedEpisodes)?.toDouble() ?: return null
     // Everything up to the count counts as watched — that is all AniList and MAL store — so the
     // set grows even when the row itself is already far enough along.
-    val watched = local.watchedEpisodes + generateSequence(1.0) { it + 1.0 }
-        .takeWhile { it <= remoteProgress }
-        .toSet()
+    val recorded = local.withWatchedThrough(remoteProgress)
     // A clock for an episode the account says is finished belongs to a watch that completed
     // somewhere else; anything above the count is still genuinely part-watched here.
     val points = local.resumePoints.filterKeys { key ->
@@ -333,10 +379,10 @@ internal fun historyAfterRemoteProgress(
         number > remoteProgress
     }
     if (target <= local.episodeNumber) {
-        if (watched == local.watchedEpisodes && points == local.resumePoints) return null
-        return local.copy(watchedEpisodes = watched, resumePoints = points)
+        if (recorded == local && points == local.resumePoints) return null
+        return recorded.copy(resumePoints = points)
     }
-    return local.copy(
+    return recorded.copy(
         episodeNumber = target,
         // The stored title belongs to the episode being left behind, and this device has no
         // catalogue here; the watch screen fills it in on the next resolve.
@@ -346,7 +392,6 @@ internal fun historyAfterRemoteProgress(
         // Ordering is by updatedAt, so a row advanced by another device has to carry that device's
         // timestamp or Continue Watching would claim the viewer watched it just now.
         updatedAt = maxOf(local.updatedAt, remoteUpdatedAt),
-        watchedEpisodes = watched,
         resumePoints = points,
     )
 }
@@ -361,12 +406,12 @@ internal fun historyAfterRemoteProgress(
  * next sync after the next episode airs moves it on.
  */
 internal fun remoteRowEpisode(progress: Int, totalEpisodes: Int?, airedEpisodes: Int?): Int? {
-    val next = progress + 1
+    val next = progress.toLong() + 1
     if (totalEpisodes != null && totalEpisodes > 0 && next > totalEpisodes) return null
     if (airedEpisodes != null && airedEpisodes > 0 && next > airedEpisodes) {
         return minOf(progress, airedEpisodes).takeIf { it >= 1 }
     }
-    return next
+    return next.takeIf { it in 1..Int.MAX_VALUE.toLong() }?.toInt()
 }
 
 /**
@@ -408,7 +453,7 @@ private val OFF_WATCHING_STATUSES = setOf("COMPLETED", "DROPPED", "PAUSED")
 internal fun isFinishedSeriesLeftover(row: HistoryEntry, status: String?, totalEpisodes: Int?): Boolean {
     if (status != "COMPLETED") return false
     val total = totalEpisodes?.takeIf { it > 0 } ?: return false
-    return row.episodeNumber >= total && row.episodeNumber in row.watchedEpisodes
+    return row.episodeNumber >= total && row.isEpisodeWatched(row.episodeNumber)
 }
 
 /** The stored name of [HistoryEntry.watchedEpisodes]; its absence is what marks a legacy row. */
@@ -450,13 +495,13 @@ internal fun seedLegacyWatchedEpisodes(
 
 /** Every whole episode below the one in progress. A row on episode 1 has nothing to seed. */
 private fun HistoryEntry.seededWatchedEpisodes(): HistoryEntry {
-    if (episodeNumber <= 1.0) return this
-    return copy(
-        watchedEpisodes = generateSequence(1.0) { it + 1.0 }
-            .takeWhile { it < episodeNumber }
-            .toSet(),
-    )
+    if (!episodeNumber.isFinite() || episodeNumber <= 1.0 || inferredWatchedBefore != null) return this
+    return if (episodeNumber <= MAX_EXPLICIT_INFERRED_EPISODES + 1.0) {
+        copy(watchedEpisodes = (1 until kotlin.math.ceil(episodeNumber).toInt()).map(Int::toDouble).toSet())
+    } else copy(inferredWatchedBefore = episodeNumber)
 }
+
+private const val MAX_EXPLICIT_INFERRED_EPISODES = 10_000
 
 /** A saved series the user wants to watch. */
 @Serializable

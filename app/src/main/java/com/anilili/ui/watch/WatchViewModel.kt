@@ -1811,6 +1811,8 @@ class WatchViewModel : ViewModel() {
                 // accumulates has to be carried across explicitly or it is silently dropped.
                 watchedEpisodes = existing?.watchedEpisodes.orEmpty(),
                 resumePoints = existing?.resumePoints.orEmpty(),
+                inferredWatchedBefore = existing?.inferredWatchedBefore,
+                unwatchedEpisodes = existing?.unwatchedEpisodes.orEmpty(),
             ),
         )
     }

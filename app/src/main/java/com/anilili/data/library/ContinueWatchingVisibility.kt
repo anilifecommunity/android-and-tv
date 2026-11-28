@@ -60,8 +60,8 @@ internal fun returnsToContinueAt(
     // thing to play. Only a set that records something can say so — an empty one is a row that
     // predates the set, and says nothing either way.
     if (entry.episodeNumber < episode &&
-        entry.watchedEpisodes.isNotEmpty() &&
-        entry.episodeNumber !in entry.watchedEpisodes
+        entry.watchedEpisodeCount > 0 &&
+        !entry.isEpisodeWatched(entry.episodeNumber)
     ) {
         return null
     }

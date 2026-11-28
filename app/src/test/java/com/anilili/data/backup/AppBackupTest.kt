@@ -53,6 +53,20 @@ class AppBackupTest {
     }
 
     @Test
+    fun `compact watched history and corrections survive a bounded backup`() {
+        val entry = document.history.single().copy(inferredWatchedBefore = 1_000_000_001.0,
+            watchedEpisodes = setOf(2.5), unwatchedEpisodes = setOf(4.0))
+        val source = document.copy(history = listOf(entry))
+        val encoded = AppBackup.encode(source)
+        assertTrue(encoded.length < 10_000)
+        val restored = AppBackup.decode(encoded)
+        assertEquals(source, restored)
+        assertFalse(restored.history.single().isEpisodeWatched(4.0))
+        assertTrue(restored.history.single().isEpisodeWatched(999_999_999.0))
+        assertTrue(restored.history.single().isEpisodeWatched(2.5))
+    }
+
+    @Test
     fun `an older document restores as itself, with the missing sections empty`() {
         // What a build that only ever backed up settings would have written.
         val text = """

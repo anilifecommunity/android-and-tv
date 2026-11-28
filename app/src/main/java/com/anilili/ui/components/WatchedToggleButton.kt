@@ -72,13 +72,13 @@ fun toggleEpisodeWatched(
     // Ticking the last episode finishes the title, as the same tick sent as progress does on an
     // account. Only ever adds the mark: unticking an episode is a correction, not "not finished".
     if (!currentlyWatched) {
-        val furthest = LibraryStore.historyFor(anilistId)?.watchedEpisodes?.maxOrNull() ?: episodeNumber
+        val furthest = LibraryStore.historyFor(anilistId)?.furthestWatchedEpisode() ?: episodeNumber
         if (finishesSeries(maxOf(furthest, episodeNumber).toInt(), totalEpisodes)) {
             LocalWatchedStore.markFinished(anilistId, title, cover, totalEpisodes)
         }
     }
     if (!currentlyWatched && LibraryStore.canSyncProgress(anilistId)) {
-        val furthest = LibraryStore.historyFor(anilistId)?.watchedEpisodes?.maxOrNull()
+        val furthest = LibraryStore.historyFor(anilistId)?.furthestWatchedEpisode()
         LibraryStore.enqueueProgressSync(
             anilistId,
             maxOf(furthest ?: episodeNumber, episodeNumber).toInt(),

@@ -157,7 +157,7 @@ fun WatchProgressBar(fraction: Float, modifier: Modifier = Modifier) {
  */
 fun episodeWatchFraction(entry: com.anilili.data.library.HistoryEntry?, episodeNumber: Double): Float = when {
     entry == null -> 0f
-    episodeNumber in entry.watchedEpisodes -> 1f
+    entry.isEpisodeWatched(episodeNumber) -> 1f
     else -> entry.resumeFor(episodeNumber)
         ?.let { if (it.durationMs > 0) (it.positionMs.toFloat() / it.durationMs).coerceIn(0f, 1f) else 0f }
         ?: 0f
@@ -170,12 +170,12 @@ fun episodeWatchFraction(entry: com.anilili.data.library.HistoryEntry?, episodeN
  * list draw with and is the *looser* test: that one also fires on an episode merely resumed to
  * within a second of its end, which is a different thing from a mark. The eye writes through
  * [com.anilili.data.library.historyAfterEpisodeToggled], and that flips membership of
- * [com.anilili.data.library.HistoryEntry.watchedEpisodes] and nothing else — so an eye filled on
+ * [com.anilili.data.library.HistoryEntry.isEpisodeWatched], including explicit corrections; an eye filled on
  * the fraction would offer to unmark an episode that is not marked, and the press would be dropped
- * as a no-op. The state the eye draws and the state the press flips have to be the same field.
+ * as a no-op. The eye and the press must use the same watched state.
  */
 fun episodeMarkedWatched(entry: com.anilili.data.library.HistoryEntry?, episodeNumber: Double): Boolean =
-    entry?.watchedEpisodes?.contains(episodeNumber) == true
+    entry?.isEpisodeWatched(episodeNumber) == true
 
 /**
  * Where a part-watched episode was left, as a clock.

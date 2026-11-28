@@ -125,13 +125,15 @@ private fun legacyProjection(profileId: String, snapshot: LegacyMediaSnapshot): 
     val historyWire = snapshot.sections["history"]?.let { legacyJson.parseToJsonElement(it).jsonArray }.orEmpty()
     history.forEachIndexed { index, row ->
         val ordinal = legacyOrdinal(row.episodeNumber)
-        val inferred = "watchedEpisodes" !in historyWire[index].jsonObject && row.episodeNumber > 1
+        val boundary = row.inferredWatchedBefore ?: row.episodeNumber.takeIf {
+            "watchedEpisodes" !in historyWire[index].jsonObject && it > 1
+        }
+        val effective = row.copy(inferredWatchedBefore = boundary)
         metadata(row.anilistId, row.title, row.cover, buildJsonObject {
             put("currentUnitId", "legacy-episode:$ordinal"); put("updatedAt", row.updatedAt)
             // Keep the old inference compact; never allocate 1..episodeNumber from an imported number.
-            if (inferred) put("legacyWatchedBefore", ordinal)
+            boundary?.let { put("legacyWatchedBefore", legacyOrdinal(it)) }
         })
-        row.watchedEpisodes.forEach { unit(row.anilistId, it, null, true, row.updatedAt) }
         val resumes = linkedMapOf<String, Pair<Double, EpisodeResume>>()
         row.resumePoints.forEach { (key, resume) ->
             val number = key.toDoubleOrNull() ?: throw IllegalArgumentException("Invalid legacy resume key")
@@ -140,9 +142,13 @@ private fun legacyProjection(profileId: String, snapshot: LegacyMediaSnapshot): 
         }
         // Per-episode clocks take priority over the old single current-episode clock.
         if (ordinal !in resumes) resumes[ordinal] = row.episodeNumber to EpisodeResume(row.positionMs, row.durationMs)
-        resumes.values.forEach { (number, resume) ->
+        resumes.values.forEach { (_, resume) ->
             require(resume.positionMs >= 0 && resume.durationMs >= 0)
-            if (number !in row.watchedEpisodes) unit(row.anilistId, number, resume, false, row.updatedAt)
+        }
+        val numbers = row.watchedEpisodes + row.unwatchedEpisodes + resumes.values.map { it.first }
+        numbers.forEach { number ->
+            val completed = effective.isEpisodeWatched(number)
+            unit(row.anilistId, number, if (completed) null else resumes[legacyOrdinal(number)]?.second, completed, row.updatedAt)
         }
     }
     snapshot.rows<RemoteListStatus>("remote_statuses").forEach { row ->

@@ -124,7 +124,7 @@ object Recommendations {
     /** Titles actually played on this device — account-seeded rows are already in the list. */
     private fun played(): List<PlayedTitle> = LibraryStore.history.value
         .filterNot { it.fromRemote }
-        .map { PlayedTitle(it.anilistId, it.watchedEpisodes.size, it.updatedAt) }
+        .map { PlayedTitle(it.anilistId, it.watchedEpisodeCount, it.updatedAt) }
 
     /** "For you": the whole list's taste, blended. Null when there is nothing to go on yet. */
     suspend fun forYou(limit: Int = 30): RecommendationRow? {
