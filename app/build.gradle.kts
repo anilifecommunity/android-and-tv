@@ -181,6 +181,8 @@ android {
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
+            // repo1 repeatedly rate-limits hosted framework downloads; keep the same Maven Central artifacts.
+            all { it.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2") }
             // Production code logs through DiagnosticsLog, which reads SystemClock. Without this,
             // any unit test that walks a logging path dies on "not mocked" instead of asserting.
             isReturnDefaultValues = true
