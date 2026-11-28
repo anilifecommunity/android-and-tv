@@ -2191,7 +2191,7 @@ fun SettingsScreen(
                 item(key = "Skip button") {
                     MidnightSettingSwitchRow(
                         title = "Skip button",
-                        description = "A one-press jump on the controls when a show has no skip timings",
+                        description = "Show the fixed +${skipButtonSeconds}s jump when no timed skip applies",
                         checked = showSkipButton,
                         onCheckedChange = SettingsStore::setShowSkipButton,
                     )

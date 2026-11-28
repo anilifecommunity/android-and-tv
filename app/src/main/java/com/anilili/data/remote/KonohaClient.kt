@@ -64,9 +64,19 @@ data class KonohaDetail(
     val anilist: Media? = null,
     /** The season chain, walked by the generator exactly as the app walks it; the title included. */
     val series: List<Int> = emptyList(),
+    val seriesCoverage: KonohaSeriesCoverage? = null,
     /** AniList's community recommendations, best rated first, as list-card records. */
     val recommendations: List<Media> = emptyList(),
 )
+
+@Serializable
+data class KonohaSeriesCoverage(
+    val coverage: String? = null,
+    val unresolvedIds: List<Int> = emptyList(),
+    val truncated: Boolean = false,
+) {
+    val complete: Boolean get() = coverage == "complete" && unresolvedIds.isEmpty() && !truncated
+}
 
 /**
  * The Bangumi subject this title was matched to, and the names to search Chinese sources with.
@@ -322,7 +332,7 @@ class KonohaClient(
                     .build()
                     
                 runCatching {
-                    client.newCall(request).execute().use { response ->
+                    client.newCall(request).readCancellable { response ->
                         if (response.code == 404) {
                             CachedMapping(null)
                         } else if (!response.isSuccessful) {
@@ -368,7 +378,7 @@ class KonohaClient(
                     .url(url)
                     .header("Accept", "application/json")
                     .build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request).readCancellable { response ->
                     when {
                         response.code == 404 -> null
                         !response.isSuccessful -> error("Konoha HTTP ${response.code}")
@@ -408,7 +418,7 @@ class KonohaClient(
                     .url(url)
                     .header("Accept", "application/json")
                     .build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request).readCancellable { response ->
                     when {
                         response.code == 404 -> null
                         !response.isSuccessful -> error("Konoha HTTP ${response.code}")
@@ -434,7 +444,7 @@ class KonohaClient(
                 .url(url)
                 .header("Accept", "application/json")
                 .build()
-            client.newCall(request).execute().use { response ->
+            client.newCall(request).readCancellable { response ->
                 when {
                     response.code == 404 -> emptyList()
                     !response.isSuccessful -> error("Konoha HTTP ${response.code}")
@@ -476,7 +486,7 @@ class KonohaClient(
                 .url(url)
                 .header("Accept", "application/json")
                 .build()
-            client.newCall(request).execute().use { response ->
+            client.newCall(request).readCancellable { response ->
                 when {
                     response.code == 404 -> emptyList()
                     !response.isSuccessful -> error("Konoha HTTP ${response.code}")
@@ -506,7 +516,7 @@ class KonohaClient(
      */
     suspend fun dubIndex(): Set<Int> = withContext(Dispatchers.IO) {
         val request = Request.Builder().url("$DATA_BASE/dub-index.json").build()
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).readCancellable { response ->
             check(response.isSuccessful) { "Dub index HTTP ${response.code}" }
             val source = checkNotNull(response.body).source()
             require(!source.request(MAX_DUB_INDEX_BYTES + 1)) { "Dub index too large" }
@@ -534,7 +544,7 @@ class KonohaClient(
                 cacheIf = { it.titles.isNotEmpty() },
             ) {
                 val request = Request.Builder().url("$DATA_BASE/filler-index.json").build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request).readCancellable { response ->
                     when {
                         // Not published yet: an empty index, which leaves every title to MAL.
                         response.code == 404 -> FillerIndex()
@@ -569,7 +579,7 @@ class KonohaClient(
                     .url("$DATA_BASE/skip/${anilistId / 1000}/$anilistId.json")
                     .header("Accept", "application/json")
                     .build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request).readCancellable { response ->
                     when {
                         response.code == 404 -> null
                         !response.isSuccessful -> error("Konoha skip HTTP ${response.code}")
@@ -602,7 +612,7 @@ class KonohaClient(
                 cacheIf = { it.titles.isNotEmpty() },
             ) {
                 val request = Request.Builder().url("$DATA_BASE/backdrops.json").build()
-                client.newCall(request).execute().use { response ->
+                client.newCall(request).readCancellable { response ->
                     when {
                         // Not published yet: every title goes to the live lookup.
                         response.code == 404 -> HeroBackdropIndex()
@@ -631,7 +641,7 @@ class KonohaClient(
      */
     suspend fun dubEpisodes(): Map<Int, Int> = withContext(Dispatchers.IO) {
         val request = Request.Builder().url("$DATA_BASE/dub-episodes.json").build()
-        client.newCall(request).execute().use { response ->
+        client.newCall(request).readCancellable { response ->
             check(response.isSuccessful) { "Dub episodes HTTP ${response.code}" }
             val source = checkNotNull(response.body).source()
             require(!source.request(MAX_FILLER_INDEX_BYTES + 1)) { "Dub episodes too large" }

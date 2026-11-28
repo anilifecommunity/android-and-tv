@@ -73,7 +73,8 @@ jobs:
 
       - name: Build analyzed variants
         if: matrix.build-mode == 'manual'
-        run: ./gradlew :app:assembleMobileDebug :app:assembleTvDebug --max-workers=2 --no-configuration-cache --console=plain
+        # CodeQL must observe compilation even when Gradle restores a previous build.
+        run: ./gradlew :app:assembleMobileDebug :app:assembleTvDebug --rerun-tasks --no-build-cache -Pkotlin.incremental=false --max-workers=2 --no-configuration-cache --console=plain
 
       - name: Stop Gradle daemon
         if: matrix.build-mode == 'manual'

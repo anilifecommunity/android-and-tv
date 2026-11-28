@@ -53,6 +53,6 @@ object WatchedTitles {
     internal fun playedThrough(media: Media, row: HistoryEntry): Boolean {
         if (media.status != "FINISHED") return false
         val total = media.episodes?.takeIf { it > 0 } ?: return false
-        return (1..total).all { it.toDouble() in row.watchedEpisodes }
+        return row.hasWatchedEveryEpisodeThrough(total)
     }
 }

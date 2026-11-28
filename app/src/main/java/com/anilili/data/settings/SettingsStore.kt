@@ -6,6 +6,7 @@ import com.anilili.data.remote.normalizeSubtitleLanguages
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
@@ -16,8 +17,12 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import com.anilili.data.AppGraph
 import com.anilili.data.device.isTelevision
+import com.anilili.data.device.hasConservativeMemoryBudget
+import com.anilili.data.device.effectiveBackdropBlur
 import com.anilili.diagnostics.CrashReporter
 import java.io.IOException
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 import com.anilili.data.model.WatchedFilter
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +39,7 @@ import kotlinx.coroutines.withContext
 import com.anilili.diagnostics.DiagnosticsLog
 import okio.buffer
 import okio.source
+import okio.sink
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -207,7 +213,7 @@ enum class AppLayoutMode(val storedValue: String, val label: String) {
 
     companion object {
         fun fromStored(value: String?): AppLayoutMode =
-            entries.firstOrNull { it.storedValue == value } ?: CINEMA
+            entries.firstOrNull { it.storedValue == value } ?: LEGACY
     }
 }
 
@@ -715,6 +721,7 @@ object SettingsStore {
 
     /** Held only to re-ask the television question once the persisted half of it has been read. */
     @Volatile private var appContext: Context? = null
+    private var conservativeMemory = true
 
     private val _autoplay = MutableStateFlow(true)
     val autoplay = _autoplay.asStateFlow()
@@ -1168,7 +1175,7 @@ object SettingsStore {
     private val _formFactorPreference = MutableStateFlow(FormFactorPreference.AUTOMATIC)
     val formFactorPreference = _formFactorPreference.asStateFlow()
 
-    private val _appLayoutMode = MutableStateFlow(AppLayoutMode.CINEMA)
+    private val _appLayoutMode = MutableStateFlow(AppLayoutMode.LEGACY)
     val appLayoutMode = _appLayoutMode.asStateFlow()
 
     /**
@@ -1296,6 +1303,11 @@ object SettingsStore {
     private val _homeLayout = MutableStateFlow<String?>(null)
     val homeLayout = _homeLayout.asStateFlow()
 
+    private val _libraryViewNames = MutableStateFlow<String?>(null)
+    val libraryViewNames = _libraryViewNames.asStateFlow()
+    private val _hiddenLibraryCustomListKeys = MutableStateFlow("")
+    val hiddenLibraryCustomListKeys = _hiddenLibraryCustomListKeys.asStateFlow()
+
     /** Who resolves hostnames, for a network whose own resolver refuses to. See [AppDns]. */
     private val _dohProvider = MutableStateFlow(DohProvider.NONE)
     val dohProvider = _dohProvider.asStateFlow()
@@ -1311,6 +1323,7 @@ object SettingsStore {
     fun init(context: Context) {
         val app = context.applicationContext
         appContext = app
+        conservativeMemory = hasConservativeMemoryBudget(app)
         store = PreferenceDataStoreFactory.create(
             scope = scope,
             produceFile = { app.preferencesDataStoreFile("anilili_settings") },
@@ -1324,6 +1337,8 @@ object SettingsStore {
             }
             runCatching { migrateLegacyPreferences(app) }
                 .onFailure { CrashReporter.logNonFatal("Settings migration failed", it) }
+            runCatching { store.edit(::migrateLayoutPreferences) }
+                .onFailure { CrashReporter.logNonFatal("Layout migration failed", it) }
             runCatching { seedHoldToSpeedFromLegacyGestures() }
                 .onFailure { CrashReporter.logNonFatal("Hold-to-speed seed failed", it) }
             store.data
@@ -1666,7 +1681,7 @@ object SettingsStore {
                         prefs[APP_BACKDROP_IMAGE],
                     ),
                     dim = AppBackdropDim.fromStored(prefs[APP_BACKDROP_DIM]).alpha,
-                    blur = prefs[APP_BACKDROP_BLUR] ?: true,
+                    blur = effectiveBackdropBlur(prefs[APP_BACKDROP_BLUR], AppGraph.isTv, conservativeMemory),
                 )
             }
     }
@@ -1728,7 +1743,67 @@ object SettingsStore {
 
     fun setAppLayoutMode(value: AppLayoutMode) {
         _appLayoutMode.value = value
-        scope.launch { store.edit { it[APP_LAYOUT_MODE] = value.storedValue } }
+        scope.launch {
+            store.edit {
+                it[APP_LAYOUT_MODE] = value.storedValue
+                it[APP_LAYOUT_MIGRATION_VERSION] = 1
+            }
+        }
+    }
+
+    internal suspend fun copySettingsForNewProfile(from: File, to: File) = withContext(Dispatchers.IO) {
+        require(from.canonicalFile != to.canonicalFile && !to.exists()) { "New profile settings must have a new destination" }
+        val inherited = from.source().buffer().use {
+            androidx.datastore.preferences.core.PreferencesSerializer.readFrom(it)
+        }.toMutablePreferences()
+        inherited -= APP_LAYOUT_MODE
+        inherited -= APP_LAYOUT_MIGRATION_VERSION
+        inherited -= LIBRARY_VIEW_NAMES
+        inherited -= HIDDEN_LIBRARY_CUSTOM_LIST_KEYS
+        migrateLayoutPreferences(inherited)
+        to.parentFile?.mkdirs()
+        val staged = File(to.parentFile, "${to.name}.new-profile")
+        try {
+            FileOutputStream(staged).use { stream ->
+                stream.sink().buffer().use { sink ->
+                    androidx.datastore.preferences.core.PreferencesSerializer.writeTo(inherited, sink)
+                    sink.flush()
+                    stream.fd.sync()
+                }
+            }
+            if (!staged.renameTo(to)) throw IOException("New profile settings could not be committed")
+        } finally {
+            staged.delete()
+        }
+    }
+
+    internal fun migrateLayoutPreferences(prefs: MutablePreferences) {
+        if ((prefs[APP_LAYOUT_MIGRATION_VERSION] ?: 0) >= 1) return
+        prefs[APP_LAYOUT_MODE] = AppLayoutMode.LEGACY.storedValue
+        prefs[APP_LAYOUT_MIGRATION_VERSION] = 1
+    }
+
+    fun setLibraryViewNames(value: String) {
+        _libraryViewNames.value = value
+        scope.launch { store.edit { it[LIBRARY_VIEW_NAMES] = value } }
+    }
+
+    fun setHiddenLibraryCustomListKeys(value: String) {
+        _hiddenLibraryCustomListKeys.value = value
+        scope.launch { store.edit { it[HIDDEN_LIBRARY_CUSTOM_LIST_KEYS] = value } }
+    }
+
+    fun renameHiddenLibraryList(fromKey: String, toKey: String? = null) {
+        _hiddenLibraryCustomListKeys.value = updatedHiddenLibraryListKeys(
+            _hiddenLibraryCustomListKeys.value, fromKey, toKey,
+        )
+        scope.launch {
+            store.edit {
+                it[HIDDEN_LIBRARY_CUSTOM_LIST_KEYS] = updatedHiddenLibraryListKeys(
+                    it[HIDDEN_LIBRARY_CUSTOM_LIST_KEYS].orEmpty(), fromKey, toKey,
+                )
+            }
+        }
     }
 
     /**
@@ -1963,30 +2038,35 @@ object SettingsStore {
      */
     suspend fun restoreSettings(values: JsonObject): Int {
         var applied = 0
-        store.edit { prefs ->
-            backupKeys.forEach { prefs -= it }
-            BACKUP_BOOLEAN_KEYS.forEach { key ->
-                val value = values.primitive(key.name)?.booleanOrNull ?: return@forEach
-                prefs[key] = value
-                applied++
-            }
-            BACKUP_INT_KEYS.forEach { key ->
-                val value = values.primitive(key.name)?.intOrNull ?: return@forEach
-                prefs[key] = value
-                applied++
-            }
-            BACKUP_FLOAT_KEYS.forEach { key ->
-                val value = values.primitive(key.name)?.floatOrNull ?: return@forEach
-                prefs[key] = value
-                applied++
-            }
-            BACKUP_STRING_KEYS.forEach { key ->
-                val value = values.primitive(key.name)?.takeIf { it.isString }?.content
-                    ?: return@forEach
-                prefs[key] = value
-                applied++
-            }
+        store.edit { prefs -> applied = applyRestoredSettings(prefs, values) }
+        return applied
+    }
+
+    internal fun applyRestoredSettings(prefs: MutablePreferences, values: JsonObject): Int {
+        var applied = 0
+        backupKeys.forEach { prefs -= it }
+        BACKUP_BOOLEAN_KEYS.forEach { key ->
+            val value = values.primitive(key.name)?.booleanOrNull ?: return@forEach
+            prefs[key] = value
+            applied++
         }
+        BACKUP_INT_KEYS.forEach { key ->
+            val value = values.primitive(key.name)?.intOrNull ?: return@forEach
+            prefs[key] = value
+            applied++
+        }
+        BACKUP_FLOAT_KEYS.forEach { key ->
+            val value = values.primitive(key.name)?.floatOrNull ?: return@forEach
+            prefs[key] = value
+            applied++
+        }
+        BACKUP_STRING_KEYS.forEach { key ->
+            val value = values.primitive(key.name)?.takeIf { it.isString }?.content
+                ?: return@forEach
+            prefs[key] = value
+            applied++
+        }
+        migrateLayoutPreferences(prefs)
         return applied
     }
 
@@ -2113,13 +2193,17 @@ object SettingsStore {
         _appBackdropAnimeTitle.value = prefs[APP_BACKDROP_ANIME_TITLE]
         _appBackdropImage.value = prefs[APP_BACKDROP_IMAGE]
         _appBackdropDim.value = AppBackdropDim.fromStored(prefs[APP_BACKDROP_DIM])
-        _appBackdropBlur.value = prefs[APP_BACKDROP_BLUR] ?: true
         _formFactorPreference.value = FormFactorPreference.fromStored(prefs[FORM_FACTOR_PREFERENCE])
-        _appLayoutMode.value = AppLayoutMode.fromStored(prefs[APP_LAYOUT_MODE])
+        _appLayoutMode.value = if ((prefs[APP_LAYOUT_MIGRATION_VERSION] ?: 0) >= 1) {
+            AppLayoutMode.fromStored(prefs[APP_LAYOUT_MODE])
+        } else AppLayoutMode.LEGACY
+        _libraryViewNames.value = prefs[LIBRARY_VIEW_NAMES]
+        _hiddenLibraryCustomListKeys.value = prefs[HIDDEN_LIBRARY_CUSTOM_LIST_KEYS].orEmpty()
         _leanbackLauncherSeen.value = prefs[LEANBACK_LAUNCHER_SEEN] ?: false
         // Both of the above feed AppGraph.isTv, which was seeded from the device's signals alone on
         // the startup path — this file had not been read yet. Now it has.
         appContext?.let { AppGraph.refreshIsTv(isTelevision(it)) }
+        _appBackdropBlur.value = effectiveBackdropBlur(prefs[APP_BACKDROP_BLUR], AppGraph.isTv, conservativeMemory)
         _downloadQuality.value = DownloadQuality.fromStored(prefs[DOWNLOAD_QUALITY])
         _downloadDestination.value = DownloadDestination.fromStored(prefs[DOWNLOAD_DESTINATION])
         _downloadHardSubsOnly.value = prefs[DOWNLOAD_HARD_SUBS_ONLY] ?: false
@@ -2292,6 +2376,9 @@ object SettingsStore {
     private val APP_BACKDROP_BLUR = booleanPreferencesKey("app_backdrop_blur")
     private val FORM_FACTOR_PREFERENCE = stringPreferencesKey("form_factor_preference")
     private val APP_LAYOUT_MODE = stringPreferencesKey("app_layout_mode")
+    private val APP_LAYOUT_MIGRATION_VERSION = intPreferencesKey("app_layout_migration_version")
+    private val LIBRARY_VIEW_NAMES = stringPreferencesKey("library_view_names")
+    private val HIDDEN_LIBRARY_CUSTOM_LIST_KEYS = stringPreferencesKey("hidden_library_custom_list_keys")
     private val LEANBACK_LAUNCHER_SEEN = booleanPreferencesKey("leanback_launcher_seen")
     private val DOWNLOAD_QUALITY = stringPreferencesKey("download_quality")
     private val DOWNLOAD_DESTINATION = stringPreferencesKey("download_destination")
@@ -2395,6 +2482,7 @@ object SettingsStore {
     ) + GLASS_KEYS.values
 
     private val BACKUP_INT_KEYS = listOf(
+        APP_LAYOUT_MIGRATION_VERSION,
         THEME_CUSTOM_SEED,
         SKIP_BUTTON_SECONDS,
         WATCHED_THRESHOLD_PERCENT,
@@ -2412,6 +2500,8 @@ object SettingsStore {
 
     private val BACKUP_STRING_KEYS = listOf(
         APP_LAYOUT_MODE,
+        LIBRARY_VIEW_NAMES,
+        HIDDEN_LIBRARY_CUSTOM_LIST_KEYS,
         DIAGNOSTIC_DETAIL,
         EPISODE_DRAWER_LAYOUT,
         CAPTION_BACKGROUND_COLOR,
@@ -2537,6 +2627,17 @@ internal fun encodePersistentCaptionDelays(delays: Map<Int, Long>): String = del
     .joinToString(",") { (animeId, delayMs) ->
         "$animeId:${delayMs.coerceIn(-MAX_CAPTION_DELAY_MS, MAX_CAPTION_DELAY_MS)}"
     }
+
+internal fun updatedHiddenLibraryListKeys(stored: String, from: String, to: String?): String {
+    if (from == to) return stored
+    val keys = stored.split(',').filterTo(linkedSetOf()) { it.isNotBlank() }
+    val wasHidden = keys.remove(from)
+    if (to != null) {
+        keys.remove(to)
+        if (wasHidden) keys.add(to)
+    }
+    return keys.joinToString(",")
+}
 
 internal fun decodePersistentCaptionDelays(stored: String?): Map<Int, Long> = stored
     .orEmpty()

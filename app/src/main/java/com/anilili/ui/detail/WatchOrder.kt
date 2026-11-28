@@ -66,7 +66,7 @@ internal fun buildWatchOrder(
 
     val relationLabels = HashMap<Int, String>()
     (sequenceOf(info) + series.asSequence()).forEach { member ->
-        member.relations.edges.forEach edge@{ edge ->
+        member.relations.edges.orEmpty().forEach edge@{ edge ->
             val type = edge.relationType ?: return@edge
             if (type !in FRANCHISE_RELATIONS) return@edge
             val node = edge.node ?: return@edge

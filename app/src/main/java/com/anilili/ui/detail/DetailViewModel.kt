@@ -73,23 +73,9 @@ data class DetailData(
      * back to.
      */
     val logo: String? = null,
-    /**
-     * The logo for the page's own season — its own, or the series' borrowed from a sibling — kept
-     * whichever season chip is selected.
-     *
-     * The phone's header always describes the page's own entry (its title, its cover, its list
-     * button), so it cannot take [logo], which follows the selection: it used to hide the logo the
-     * moment any other chip was picked and set the title in type instead, where the television,
-     * whose pane follows the selection, kept a logo. This is the page's logo held apart from the
-     * selection, so the phone keeps one too without putting another season's lockup beside its
-     * own cover.
-     */
-    val pageLogo: String? = null,
 ) {
     /**
-     * Episodic entries of the prequel/sequel chain, in airing order — one detail page serves the
-     * whole series and the Episodes tab filters between its seasons. Movies and specials stay on
-     * the Related tab.
+     * Continuations share one picker; films and specials keep their own identities and labels.
      */
     val seasons: List<Media>
         get() = seasonChain(info, series)
@@ -102,9 +88,14 @@ data class DetailData(
     val selectedSeason: Media
         get() = seasons.firstOrNull { it.id == selectedSeasonId } ?: info
 
+    fun withSeries(members: List<Media>): DetailData = copy(
+        series = (listOf(info, selectedSeason) + members).distinctBy(Media::id).sortedWith(SERIES_AIRING_ORDER),
+        seriesLoading = false,
+    )
+
     /** What each of [seasons] is called in a picker, by id; see [seasonLabels]. */
     val seasonLabels: Map<Int, String>
-        get() = seasonLabels(seasons, ::bundledTvdbRef)
+        get() = continuationLabels(seasons, ::bundledTvdbRef)
 
     /**
      * The franchise as a running order — seasons, films, OVAs and specials — for the Related tab.
@@ -114,9 +105,9 @@ data class DetailData(
      */
     val watchOrder: List<WatchOrderEntry>
         get() = buildWatchOrder(
-            info = info,
+            info = selectedSeason,
             series = series,
-            seasons = seasons,
+            seasons = seasons.filterNot(Media::isExtraContinuation),
             hideAdult = SettingsStore.hideAdultContent.value,
         )
 
@@ -131,22 +122,22 @@ data class DetailData(
         }
 }
 
-private val SEASON_FORMATS = setOf("TV", "TV_SHORT", "ONA")
+private val CONTINUATION_FORMATS = setOf("TV", "TV_SHORT", "ONA", "OVA", "SPECIAL", "MOVIE")
 
 /**
- * Episodic entries of [series] that count as numbered seasons of [info], in season order.
+ * Known continuations, independent of the entry used to open the franchise.
  *
  * Shared with the player, which uses it to find the season after the one that just ended: the
  * season it moves on to has to be the one the anime page's chips call the next season, or the
  * binge lands on a spin-off the page never listed.
  */
 internal fun seasonChain(info: Media, series: List<Media>): List<Media> =
-    tvdbSeasonChain(info, series, ::bundledTvdbRef)
-        ?: series.filter { it.id == info.id || it.format in SEASON_FORMATS }
+    (listOf(info) + series).filter { it.id == info.id || it.format == null || it.format in CONTINUATION_FORMATS }
+        .distinctBy(Media::id).sortedWith(SERIES_AIRING_ORDER)
 
 /** [seasonChain]'s picker names ("Season 2", "Part 2"), by id. */
 internal fun seasonChainLabels(seasons: List<Media>): Map<Int, String> =
-    seasonLabels(seasons, ::bundledTvdbRef)
+    continuationLabels(seasons, ::bundledTvdbRef)
 
 /**
  * A season that has not started airing. The pickers keep it — knowing another season is coming is
@@ -259,14 +250,16 @@ class DetailViewModel : ViewModel() {
                 // or stale. The episode tab therefore follows the same source of truth as Home.
                 SettingsStore.awaitLoaded()
                 val info = repo.animeInfo(id, force = force) ?: error("Anime not found")
+                if (loadedId != id) return@launch
+                val previous = (_state.value as? UiState.Success)?.data?.takeIf { force && it.info.id == info.id }
                 // Seasons show instantly: the anime's own relations (already part of the cached
                 // info) seed the list with its direct prequel/sequel neighbors, and the full
                 // walked chain replaces it below once animeSeries returns (cached per member,
                 // so revisits of any season resolve it immediately too).
-                val seededSeries = (listOf(info) + info.seasonNeighbors())
+                val seededSeries = (listOf(info) + previous?.series.orEmpty() + info.seasonNeighbors())
                     .distinctBy(Media::id)
                     .sortedWith(SERIES_AIRING_ORDER)
-                val initial = DetailData(
+                val initial = previous?.copy(info = info, series = seededSeries, seriesLoading = true) ?: DetailData(
                     info = info,
                     episodes = anilistEpisodeCatalog(info),
                     preferredCategory = if (SettingsStore.preferDub.value) Category.DUB else Category.SUB,
@@ -275,23 +268,21 @@ class DetailViewModel : ViewModel() {
                 )
                 _state.value = UiState.Success(initial)
                 if (!force && !repo.isSettled(info)) launchRevalidation(info)
-                launchEpisodeEnrichment(info.id, info.idMal)
-                launchUncountedEpisodes(info)
+                launchEpisodeEnrichment(initial.selectedSeason.id, initial.selectedSeason.idMal)
+                launchUncountedEpisodes(initial.selectedSeason)
                 launchRecommendations(info.id)
-                launchLogo(info.id)
+                launchLogo(initial.selectedSeason.id)
 
                 val series = runCatching { repo.animeSeries(info) }.getOrDefault(seededSeries)
                 if (loadedId == id) {
                     val current = (_state.value as? UiState.Success)?.data ?: initial
                     // The walk started from the record first drawn; if a revalidation has replaced
                     // that since, keep the live one in the chain the season pane reads from.
-                    val walked = series.map { if (it.id == current.info.id) current.info else it }
-                    _state.value = UiState.Success(current.copy(series = walked, seriesLoading = false))
+                    _state.value = UiState.Success(current.withSeries(series))
                     // The first lookup ran against the season's neighbours alone; a series logo
                     // held only by a season further along is reachable now.
                     if (current.logo == null) launchLogo(current.selectedSeasonId)
                     // And the page's own, if a chip had moved the selection off it by then.
-                    if (current.pageLogo == null && current.selectedSeasonId != info.id) launchLogo(info.id)
                 }
                 DiagnosticsLog.event(
                     "detail",
@@ -374,6 +365,8 @@ class DetailViewModel : ViewModel() {
     fun selectSeason(seasonId: Int) {
         val current = (_state.value as? UiState.Success)?.data ?: return
         if (current.selectedSeasonId == seasonId) return
+        val selected = current.seasons.firstOrNull { it.id == seasonId } ?: return
+        if (!seasonChoosable(selected, current.selectedSeasonId)) return
         if (seasonId == current.info.id) {
             _state.value = UiState.Success(
                 current.copy(
@@ -472,11 +465,8 @@ class DetailViewModel : ViewModel() {
         viewModelScope.launch {
             val logo = repo.seriesLogo(seasonId) ?: siblingSeasonLogo(seasonId)
             val data = (_state.value as? UiState.Success)?.data ?: return@launch
-            // The page's own season's answer is kept whatever is selected by now; see pageLogo.
-            val pageLogo = if (seasonId == data.info.id && logo != null) logo else data.pageLogo
-            val selectedLogo = if (data.selectedSeasonId == seasonId) logo else data.logo
-            if (pageLogo == data.pageLogo && selectedLogo == data.logo) return@launch
-            _state.value = UiState.Success(data.copy(logo = selectedLogo, pageLogo = pageLogo))
+            if (data.selectedSeasonId != seasonId || data.logo == logo) return@launch
+            _state.value = UiState.Success(data.copy(logo = logo))
         }
     }
 

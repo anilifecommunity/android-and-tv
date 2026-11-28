@@ -135,6 +135,7 @@ class AppDeviceProfileTest {
                 Configuration.UI_MODE_TYPE_TELEVISION,
                 960,
                 memoryClassMb = 512,
+                physicalMemoryBytes = 4L * 1024 * 1024 * 1024,
             ).useLowCostTvEffects,
         )
         assertFalse(
@@ -145,6 +146,23 @@ class AppDeviceProfileTest {
                 memoryClassMb = 128,
             ).useLowCostTvEffects,
         )
+    }
+
+    @Test
+    fun `two gigabyte and unknown television memory precompose only one card`() {
+        for (memory in listOf(null, 0L, 2L * 1024 * 1024 * 1024)) {
+            val profile = resolveAppDeviceProfile(
+                Configuration.UI_MODE_TYPE_TELEVISION, 960, memoryClassMb = 512, physicalMemoryBytes = memory,
+            )
+            assertTrue(profile.useLowCostTvEffects)
+            assertEquals(1, profile.tvRailPrefetchCards)
+        }
+        val larger = resolveAppDeviceProfile(
+            Configuration.UI_MODE_TYPE_TELEVISION, 960, memoryClassMb = 512,
+            physicalMemoryBytes = 4L * 1024 * 1024 * 1024,
+        )
+        assertEquals(7, larger.tvRailPrefetchCards)
+        assertFalse(larger.useLowCostTvEffects)
     }
 
     /**

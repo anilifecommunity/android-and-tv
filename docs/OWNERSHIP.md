@@ -70,9 +70,9 @@ build flavour.
 
 ## Data and licence ownership
 
-- Anilife-authored code in the current tree uses the Anilife Source-Available License 1.0 in
-  `LICENSE`. Historical copies keep the licence under which they were received.
-- Contributors retain copyright and grant the project the rights described in `CONTRIBUTING.md`.
+- Anilife-authored 2.0.0 development code uses GNU GPL version 3 (`GPL-3.0-only`) in `LICENSE`.
+  Historical copies keep the licence under which they were received.
+- Contributors retain copyright and license new contributions as described in `CONTRIBUTING.md`.
 - Dependencies keep their own licences; the release SBOM and dependency licence report record them.
 - Maintainer-supplied logo and launch assets, and mechanical derivatives, are recorded in
   `docs/ASSET-LICENCES.md`.

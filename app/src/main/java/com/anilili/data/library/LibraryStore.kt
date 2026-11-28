@@ -709,10 +709,7 @@ object LibraryStore {
                 fromRemote = true,
                 // AniList and MAL only store a count, not which episodes were played, so the
                 // count is the best statement available: everything up to it counts as watched.
-                watchedEpisodes = generateSequence(1.0) { it + 1.0 }
-                    .takeWhile { it <= entry.progress }
-                    .toSet(),
-            )
+            ).withWatchedThrough(entry.progress)
         }
         val updated = mergedHistory(local, seeded, MAX_HISTORY)
         if (updated == _history.value) return

@@ -245,15 +245,15 @@ data class NextSeasonRequest(
  * The season to move on to after [info] ends, from its [seasons] chain.
  *
  * Only a finished season moves on — one still airing has its next episode still to come — and only
- * to a season that has started airing, since one that has not has no episode one to open. A film
- * is left alone: the fallback chain lists it among the seasons it aired between, and the TV season
- * that aired after it is not what "next" means for someone who has just watched a film.
+ * to a continuation that has started airing. Unknown metadata stops automatic advancement.
  */
 internal fun nextSeasonAfter(info: Media, seasons: List<Media>): Media? {
-    if (info.status != "FINISHED" || info.format == "MOVIE") return null
+    if (info.status != "FINISHED") return null
     val index = seasons.indexOfFirst { it.id == info.id }
     if (index < 0) return null
-    return seasons.getOrNull(index + 1)?.takeIf { it.status in AIRED_STATUSES }
+    return seasons.getOrNull(index + 1)?.takeIf {
+        it.status in AIRED_STATUSES && it.format in setOf("TV", "TV_SHORT", "ONA", "OVA", "SPECIAL", "MOVIE")
+    }
 }
 
 private val AIRED_STATUSES = setOf("FINISHED", "RELEASING", "HIATUS")
@@ -1811,6 +1811,8 @@ class WatchViewModel : ViewModel() {
                 // accumulates has to be carried across explicitly or it is silently dropped.
                 watchedEpisodes = existing?.watchedEpisodes.orEmpty(),
                 resumePoints = existing?.resumePoints.orEmpty(),
+                inferredWatchedBefore = existing?.inferredWatchedBefore,
+                unwatchedEpisodes = existing?.unwatchedEpisodes.orEmpty(),
             ),
         )
     }
@@ -2272,7 +2274,7 @@ class WatchViewModel : ViewModel() {
      */
     private fun launchNextSeasonLookup(info: Media) {
         nextSeasonJob?.cancel()
-        if (info.status != "FINISHED" || info.format == "MOVIE") return
+        if (info.status != "FINISHED") return
         nextSeasonJob = viewModelScope.launch {
             val series = runCatching { repo.animeSeries(info) }
                 .onFailure {

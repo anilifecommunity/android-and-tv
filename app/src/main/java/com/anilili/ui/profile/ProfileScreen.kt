@@ -1,5 +1,7 @@
 package com.anilili.ui.profile
 
+import com.anilili.data.settings.SettingsStore
+
 
 
 
@@ -285,6 +287,7 @@ fun ProfileScreen(
     val device = LocalAppDeviceProfile.current
     val token by AuthManager.token.collectAsState()
     val malLoggedIn by MalAuthManager.loggedIn.collectAsState()
+    val loggedIn = token != null || malLoggedIn
     val profileState by vm.profile.collectAsState()
     val history by LibraryStore.history.collectAsState()
     val historyByAnimeId = remember(history) { history.associateBy(HistoryEntry::anilistId) }
@@ -293,7 +296,7 @@ fun ProfileScreen(
     val localWatched by LocalWatchedStore.entries.collectAsState()
     // The custom lists turned *off*, by [listKey]: a list the viewer just made should show up
     // without being asked for, so the default is every list on.
-    var hiddenCustomListKeys by rememberSaveable { mutableStateOf("") }
+    val hiddenCustomListKeys by SettingsStore.hiddenLibraryCustomListKeys.collectAsState()
     var expandedCustomListKeys by rememberSaveable { mutableStateOf("") }
     var namingList by remember { mutableStateOf(false) }
     var managingListName by remember { mutableStateOf<String?>(null) }
@@ -314,7 +317,8 @@ fun ProfileScreen(
     // The TV list chips, which the remote's own search passes over between the hero and the
     // filter row; both route to them by hand.
     val tvChipsFocus = remember { FocusRequester() }
-    var selectedViewNames by rememberSaveable { mutableStateOf(defaultLibraryViewNames()) }
+    val savedViewNames by SettingsStore.libraryViewNames.collectAsState()
+    val selectedViewNames = savedViewNames ?: defaultLibraryViewNames(loggedIn)
     var selectedFormat by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedAiring by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSortName by rememberSaveable { mutableStateOf(LibrarySort.LAST_MODIFIED.name) }
@@ -343,11 +347,7 @@ fun ProfileScreen(
             EpisodeExport.request(context, downloadId)
         }
     }
-    val loggedIn = token != null || malLoggedIn
-
     LaunchedEffect(loggedIn) {
-        // Completed is there signed out too, holding what was marked watched on this device.
-        if (!loggedIn) selectedViewNames = listOf(LibraryView.WATCHLIST, LibraryView.COMPLETED).joinToString(",") { it.name }
         vm.loadIfLoggedIn()
     }
 
@@ -462,7 +462,7 @@ fun ProfileScreen(
                 selected = listKey(list.name) !in hiddenCustomLists,
             )
         },
-        onToggle = { name -> hiddenCustomListKeys = toggledKeys(hiddenCustomListKeys, listKey(name)) },
+        onToggle = { name -> SettingsStore.setHiddenLibraryCustomListKeys(toggledKeys(hiddenCustomListKeys, listKey(name))) },
         onNew = { namingList = true },
     )
     // Which sections are grids rather than carousels, held per list so opening one out does not
@@ -534,7 +534,6 @@ fun ProfileScreen(
             confirmText = "Create",
             onSave = { name ->
                 CustomListStore.create(name)?.also {
-                    hiddenCustomListKeys = hiddenCustomListKeys.split(',').filterNot { key -> key == listKey(it) }.joinToString(",")
                     namingList = false
                 }
             },
@@ -640,7 +639,7 @@ fun ProfileScreen(
                                     availableViews = availableViews,
                                     selectedViews = selectedViews,
                                     viewCounts = viewCounts,
-                                    onToggleView = { selectedViewNames = toggledLibraryViews(selectedViewNames, it) },
+                                    onToggleView = { SettingsStore.setLibraryViewNames(toggledLibraryViews(selectedViewNames, it)) },
                                     selectedFormat = selectedFormat,
                                     onFormatChange = { selectedFormat = it },
                                     selectedAiring = selectedAiring,
@@ -673,7 +672,7 @@ fun ProfileScreen(
                                     availableViews = availableViews,
                                     selectedViews = selectedViews,
                                     viewCounts = viewCounts,
-                                    onToggleView = { selectedViewNames = toggledLibraryViews(selectedViewNames, it) },
+                                    onToggleView = { SettingsStore.setLibraryViewNames(toggledLibraryViews(selectedViewNames, it)) },
                                     selectedFormat = selectedFormat,
                                     onFormatChange = { selectedFormat = it },
                                     selectedAiring = selectedAiring,
@@ -705,7 +704,7 @@ fun ProfileScreen(
                                     availableViews = availableViews,
                                     selectedViews = selectedViews,
                                     viewCounts = viewCounts,
-                                    onToggleView = { selectedViewNames = toggledLibraryViews(selectedViewNames, it) },
+                                    onToggleView = { SettingsStore.setLibraryViewNames(toggledLibraryViews(selectedViewNames, it)) },
                                     selectedFormat = selectedFormat,
                                     onFormatChange = { selectedFormat = it },
                                     selectedSort = selectedSort,
@@ -725,7 +724,7 @@ fun ProfileScreen(
                                     availableViews = availableViews,
                                     selectedViews = selectedViews,
                                     viewCounts = viewCounts,
-                                    onToggleView = { selectedViewNames = toggledLibraryViews(selectedViewNames, it) },
+                                    onToggleView = { SettingsStore.setLibraryViewNames(toggledLibraryViews(selectedViewNames, it)) },
                                     selectedFormat = selectedFormat,
                                     onFormatChange = { selectedFormat = it },
                                     selectedSort = selectedSort,
@@ -2633,14 +2632,14 @@ internal fun libraryCards(
  * they have put aside for later. Those two are the page's whole question for most accounts, and
  * showing both by default is the difference this rail exists to make.
  */
-internal fun defaultLibraryViewNames(): String =
-    listOf(LibraryView.WATCHING, LibraryView.WATCHLIST).joinToString(",") { it.name }
+internal fun defaultLibraryViewNames(loggedIn: Boolean = true): String =
+    (if (loggedIn) listOf(LibraryView.WATCHING, LibraryView.WATCHLIST)
+    else listOf(LibraryView.WATCHLIST, LibraryView.COMPLETED)).joinToString(",") { it.name }
 
 /**
  * The chosen lists, read back out of the one string that holds them.
  *
- * A `Set` in `rememberSaveable` would need its own `Saver`; joined names need nothing, and the
- * parse is then the single place the selection's two rules live. Sections come out in enum order
+ * Joined names persist in profile settings. Sections come out in enum order
  * however they were tapped, so toggling one never reshuffles the page — and a list this account
  * cannot offer is dropped rather than left as a heading over nothing.
  */

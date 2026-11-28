@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.MaterialTheme
 import com.anilili.data.device.TELEVISION_MIN_WIDTH_DP
+import com.anilili.data.device.useConservativeMemoryBudgets
+import com.anilili.data.device.physicalMemoryBytes
 import com.anilili.data.device.TelevisionSignal
 import com.anilili.data.device.TelevisionSignals
 import com.anilili.data.device.readTelevisionSignals
@@ -62,13 +64,18 @@ data class AppDeviceProfile(
     val uiScale: Float = 1f,
     /** Why [formFactor] is TV, or null when it is not. See [TelevisionSignal]. */
     val televisionSignal: TelevisionSignal? = null,
+    val physicalMemoryBytes: Long? = null,
 ) {
     val isTv: Boolean get() = formFactor == AppFormFactor.TV
     val isTablet: Boolean get() = formFactor == AppFormFactor.TABLET
     val isExpanded: Boolean get() = widthDp >= 840 || isTv
     val useNavigationRail: Boolean get() = widthDp >= 600 || isTv
     val useLowCostTvEffects: Boolean
-        get() = shouldUseLowCostTvEffects(isTv, isLowRamDevice, memoryClassMb)
+        get() = isTv && useConservativeMemoryBudget
+    val useConservativeMemoryBudget: Boolean
+        get() = useConservativeMemoryBudgets(isLowRamDevice, memoryClassMb, physicalMemoryBytes)
+    val tvRailPrefetchCards: Int
+        get() = if (useConservativeMemoryBudget) 1 else 7
 
     val pagePadding: Dp
         get() = when {
@@ -168,6 +175,7 @@ fun resolveAppDeviceProfile(
     uiScale: Float = 1f,
     signals: TelevisionSignals = TelevisionSignals(),
     preference: FormFactorPreference = FormFactorPreference.AUTOMATIC,
+    physicalMemoryBytes: Long? = null,
 ): AppDeviceProfile {
     val television = televisionSignal(uiModeType, widthDp, signals, preference)
     val formFactor = when {
@@ -175,13 +183,8 @@ fun resolveAppDeviceProfile(
         widthDp >= TELEVISION_MIN_WIDTH_DP -> AppFormFactor.TABLET
         else -> AppFormFactor.PHONE
     }
-    return AppDeviceProfile(formFactor, widthDp, isLowRamDevice, memoryClassMb, uiScale, television)
+    return AppDeviceProfile(formFactor, widthDp, isLowRamDevice, memoryClassMb, uiScale, television, physicalMemoryBytes)
 }
-
-internal fun shouldUseLowCostTvEffects(isTv: Boolean, isLowRamDevice: Boolean, memoryClassMb: Int?): Boolean =
-    isTv && (isLowRamDevice || (memoryClassMb != null && memoryClassMb <= LOW_COST_TV_MEMORY_CLASS_MB))
-
-private const val LOW_COST_TV_MEMORY_CLASS_MB = 256
 
 val LocalAppDeviceProfile = staticCompositionLocalOf {
     AppDeviceProfile(AppFormFactor.PHONE, 360)
@@ -197,12 +200,13 @@ fun rememberAppDeviceProfile(): AppDeviceProfile {
     }
     val lowRam = activityManager?.isLowRamDevice == true
     val memoryClassMb = activityManager?.memoryClass
+    val physicalMemory = remember(activityManager) { physicalMemoryBytes(activityManager) }
     // The configuration's width is the device's own, unaffected by the density override the scale
     // rides on, which is what keeps the form-factor decision anchored to the real screen.
     val uiScale = LocalUiScale.current
     val signals = rememberTelevisionSignals()
     val preference by SettingsStore.formFactorPreference.collectAsState()
-    return remember(uiModeType, configuration.screenWidthDp, lowRam, memoryClassMb, uiScale, signals, preference) {
+    return remember(uiModeType, configuration.screenWidthDp, lowRam, memoryClassMb, physicalMemory, uiScale, signals, preference) {
         resolveAppDeviceProfile(
             uiModeType,
             configuration.screenWidthDp,
@@ -211,6 +215,7 @@ fun rememberAppDeviceProfile(): AppDeviceProfile {
             uiScale,
             signals,
             preference,
+            physicalMemory,
         )
     }
 }

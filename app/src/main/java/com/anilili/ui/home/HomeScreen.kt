@@ -1,5 +1,7 @@
 package com.anilili.ui.home
 
+import com.anilili.data.model.HomeSection
+
 
 
 
@@ -76,6 +78,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.collectAsState
@@ -198,12 +201,18 @@ fun HomeScreen(
     val loadingMore by vm.loadingMore.collectAsState()
     val exhausted by vm.exhausted.collectAsState()
     val personal by vm.personal.collectAsState()
+    val settledRows by vm.settledRows.collectAsState()
     // The ViewModel's copy, not the store's: Home is where a title whose next episode is still a day
     // away steps aside, and the two screens that draw this row take it from here.
     val history by vm.continueWatching.collectAsState()
     val device = LocalAppDeviceProfile.current
     val storedLayout by SettingsStore.homeLayout.collectAsState()
     val layout = remember(storedLayout, device.isTv) { HomeLayout.decode(storedLayout, device.isTv) }
+    DisposableEffect(vm, layout) {
+        vm.setLayout(layout)
+        vm.setActive(true)
+        onDispose { vm.setActive(false) }
+    }
     var arranging by rememberSaveable { mutableStateOf(false) }
     if (arranging) HomeLayoutDialog(onDismiss = { arranging = false })
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -274,6 +283,8 @@ fun HomeScreen(
                     onOpenDetails = onOpenDetails,
                     loadingMore = loadingMore,
                     onLoadMore = vm::loadMore,
+                    settledRows = settledRows,
+                    onVisibleRows = vm::setVisibleRows,
                     primaryActionFocusTarget = tvPrimaryFocusTarget,
                 )
             }
@@ -350,6 +361,8 @@ fun HomeScreen(
                     layout = layout,
                     onArrange = { arranging = true },
                     onLoadMore = vm::loadMore,
+                    settledRows = settledRows,
+                    onVisibleRows = vm::setVisibleRows,
                     loadingMore = loadingMore,
                     exhausted = exhausted,
                     history = history,
@@ -504,6 +517,8 @@ private fun HomeContent(
     layout: HomeLayout,
     onArrange: () -> Unit,
     onLoadMore: (HomeSection) -> Unit,
+    settledRows: Set<HomeRow>,
+    onVisibleRows: (Set<HomeRow>) -> Unit,
     loadingMore: Set<HomeSection>,
     exhausted: Set<HomeSection>,
     history: List<HistoryEntry>,
@@ -552,13 +567,10 @@ private fun HomeContent(
 
         // The rows drawn right now, each with its LazyColumn key: shown, and with something in
         // them. While a row is held, in the order the drag has made so far (see HomeRowDrag.kt).
-        val drawnKeys = remember(layout, showContinue, personal, data) {
+        val drawnKeys = remember(layout, showContinue, personal, data, settledRows) {
             HomeRow.entries.associateWith { row ->
-                when (row) {
-                    HomeRow.CONTINUE -> "continue".takeIf { showContinue }
-                    HomeRow.FOR_YOU -> "for-you".takeIf { personal.forYou.isNotEmpty() }
-                    HomeRow.BECAUSE -> personal.because?.seed?.let { "because-${it.id}" }
-                    else -> row.catalogSection?.takeIf { data.section(it).isNotEmpty() }?.name
+                row.key.takeIf {
+                    row != HomeRow.CONTINUE && row !in settledRows || row.hasContent(data, personal, showContinue)
                 }
             }
         }
@@ -570,6 +582,7 @@ private fun HomeContent(
         )
         val shown = drag.order ?: layout
         val drawnRows = shown.visible.filter { drawnKeys[it] != null }
+        ObserveHomeViewport(listState, drawnRows, onVisibleRows)
 
         // What's new (ui/tour): starts once Home has settled, and scrolls the row a step points at
         // to just below the top bar. Item 0 is the spotlight; the rows follow in drawn order.
@@ -597,7 +610,7 @@ private fun HomeContent(
                 ),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                item {
+                item(key = "hero") {
                     HeroPager(
                         items = spotlight,
                         onAnimeClick = onAnimeClick,
@@ -619,6 +632,10 @@ private fun HomeContent(
                 drawnRows.forEach { row ->
                     val key = drawnKeys.getValue(row)!!
                     item(key = key) {
+                        if (!row.hasContent(data, personal, showContinue)) {
+                            PendingHomeRow(row, isTv = false)
+                            return@item
+                        }
                         val handle = Modifier.homeRowDragHandle(drag, row, key, layout, drawnRows)
                             // The first row's title line, handle and all, is what the tour's
                             // "Make Home yours" step points at.
@@ -814,8 +831,8 @@ private fun HeroPager(
         else -> 334.dp
     }
     if (device.isTv) {
-        LaunchedEffect(heroIds, safeTvPage, tvHeroHasFocus) {
-            if (items.size <= 1 || tvHeroHasFocus) return@LaunchedEffect
+        LaunchedEffect(heroIds, safeTvPage, tvHeroHasFocus, device.useLowCostTvEffects) {
+            if (device.useLowCostTvEffects || items.size <= 1 || tvHeroHasFocus) return@LaunchedEffect
             delay(HERO_AUTO_ADVANCE_MS)
             tvPage = nextHeroPage(safeTvPage, items.size)
         }
@@ -826,16 +843,14 @@ private fun HeroPager(
             pagerState.animateScrollToPage(nextHeroPage(pagerState.settledPage, items.size))
         }
     }
-    // The series' logos in place of the typed titles, as on the title page and the desktop app's
-    // spotlight. Every slide's is asked for up front, one at a time, so swiping on does not swap a
-    // title for art while it is being read; a null is "looked, none" and keeps the typed title.
+    // Only the displayed slide needs a logo; null retains its text title.
     val showSeriesLogos by SettingsStore.showSeriesLogos.collectAsState()
     val heroLogos = remember { mutableStateMapOf<Int, String?>() }
-    LaunchedEffect(heroIds, showSeriesLogos) {
-        if (!showSeriesLogos) return@LaunchedEffect
-        items
-            .filter { it.id !in heroLogos }
-            .forEach { heroLogos[it.id] = AppGraph.repository.seriesLogo(it.id) }
+    val displayedHero = items.getOrNull(if (device.isTv) safeTvPage else pagerState.currentPage)
+    LaunchedEffect(displayedHero?.id, showSeriesLogos) {
+        val current = displayedHero ?: return@LaunchedEffect
+        if (!showSeriesLogos || current.id in heroLogos) return@LaunchedEffect
+        heroLogos[current.id] = AppGraph.repository.seriesLogo(current.id)
     }
     Box(
         Modifier
@@ -848,7 +863,7 @@ private fun HeroPager(
             val page = safeTvPage
             HeroCard(
                 media = items[page],
-                logo = heroLogos[items[page].id],
+                logo = heroLogos[items[page].id].takeIf { showSeriesLogos },
                 pageIndex = page,
                 pageCount = items.size,
                 onAnimeClick = onAnimeClick,
@@ -872,7 +887,7 @@ private fun HeroPager(
             ) { page ->
                 HeroCard(
                     media = items[page],
-                    logo = heroLogos[items[page].id],
+                    logo = heroLogos[items[page].id].takeIf { showSeriesLogos },
                     pageIndex = page,
                     pageCount = items.size,
                     onAnimeClick = onAnimeClick,

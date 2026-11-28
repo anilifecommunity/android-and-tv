@@ -6,6 +6,7 @@ import com.anilili.data.model.FuzzyDate
 import com.anilili.data.model.Media
 import com.anilili.diagnostics.DiagnosticsLog
 import com.anilili.util.cached
+import com.anilili.ui.rethrowIfCancellation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.KSerializer
@@ -159,7 +160,7 @@ class TmdbClient(
                     ttlMs = EPISODES_TTL_MS,
                 ) { fetchEpisodes(media, hint) }
             }
-                .onFailure { DiagnosticsLog.throwable("TMDB episodes failed id=${media.id}", it) }
+                .onFailure { it.rethrowIfCancellation(); DiagnosticsLog.throwable("TMDB episodes failed id=${media.id}", it) }
                 .getOrDefault(emptyList())
         }
     }
@@ -182,7 +183,7 @@ class TmdbClient(
                     ttlMs = BACKDROPS_TTL_MS,
                 ) { fetchBackdrops(media, hint) }
             }
-                .onFailure { DiagnosticsLog.throwable("TMDB backdrops failed id=${media.id}", it) }
+                .onFailure { it.rethrowIfCancellation(); DiagnosticsLog.throwable("TMDB backdrops failed id=${media.id}", it) }
                 .getOrDefault(emptyList())
         }
     }
@@ -376,7 +377,7 @@ class TmdbClient(
      * TMDB for the spin-off finds nothing, so without this both entries had no stills at all.
      */
     private suspend fun parentSpecialsRun(media: Media): List<EpisodeMetadata> {
-        val parent = media.relations.edges.firstOrNull { it.relationType == "PARENT" }?.node
+        val parent = media.relations.edges.orEmpty().firstOrNull { it.relationType == "PARENT" }?.node
             ?: return emptyList()
         val series = resolveSeries(parent, hint = null) ?: return emptyList()
         val specials = get("/tv/${series.id}/season/$SPECIALS_SEASON", TmdbSeason.serializer())
@@ -429,14 +430,14 @@ class TmdbClient(
         return null
     }
 
-    private fun <T> get(path: String, serializer: KSerializer<T>): T? {
+    private suspend fun <T> get(path: String, serializer: KSerializer<T>): T? {
         val separator = if ('?' in path) "&" else "?"
         val request = Request.Builder()
             .url("$API_BASE$path${separator}language=en-US")
             .header("Authorization", "Bearer $readToken")
             .header("Accept", "application/json")
             .build()
-        return client.newCall(request).execute().use { response ->
+        return client.newCall(request).readCancellable { response ->
             when {
                 // 404 is an ordinary answer here: an id-map guess can point at a record that no
                 // longer exists, and a series can simply have no episode groups.

@@ -238,6 +238,8 @@ fun DownloadedEpisodeScreen(
                 durationMs = existing?.resumeFor(number)?.durationMs?.takeIf { resumePositionMs > 0L } ?: 0L,
                 watchedEpisodes = existing?.watchedEpisodes.orEmpty(),
                 resumePoints = existing?.resumePoints.orEmpty(),
+                inferredWatchedBefore = existing?.inferredWatchedBefore,
+                unwatchedEpisodes = existing?.unwatchedEpisodes.orEmpty(),
             ),
         )
     }

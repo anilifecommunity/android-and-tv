@@ -20,6 +20,40 @@ import org.junit.Test
 private const val DAY_SEC = 86_400L
 
 class AniListClientTest {
+    @Test
+    fun `missing collection is a failed read while a real empty page is valid`() = runBlocking {
+        server.enqueue(graphQlBody("""{"data":{"Page":null}}"""))
+        assertThrows(IllegalStateException::class.java) { runBlocking { client.collection("TRENDING_DESC") } }
+        server.enqueue(graphQlBody("""{"data":{"Page":{"pageInfo":{"hasNextPage":false},"media":[]}}}"""))
+        assertTrue(client.collection("TRENDING_DESC").items.isEmpty())
+    }
+
+    @Test
+    fun `latest aired row preserves episode order deduplicates and pages without hidden collections`() = runBlocking {
+        server.enqueue(graphQlBody("""{"data":{"Page":{"pageInfo":{"hasNextPage":true},"airingSchedules":[
+            {"media":{"id":9}},{"media":{"id":3}},{"media":{"id":9}},{"media":{"id":7,"isAdult":true}}
+        ]}}}"""))
+        val result = client.latestAired(page = 2, hideAdult = true)
+        assertEquals(listOf(9, 3), result.items.map { it.id })
+        assertEquals(2, result.page)
+        assertTrue(result.hasNextPage)
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue(body.contains("TIME_DESC"))
+        assertTrue(body.contains("\"page\":2"))
+        assertTrue(!body.contains("spotlight:") && !body.contains("movies:") && !body.contains("popular:"))
+    }
+
+    @Test
+    fun `trending row requests hero fields in a single pageable collection`() = runBlocking {
+        server.enqueue(graphQlBody("""{"data":{"Page":{"pageInfo":{"hasNextPage":false},"media":[{"id":1,"bannerImage":"wide"}]}}}"""))
+        val result = client.collection("TRENDING_DESC", spotlight = true, hideAdult = true)
+        assertEquals("wide", result.items.single().bannerImage)
+        val body = server.takeRequest().body.readUtf8()
+        assertTrue(body.contains("description"))
+        assertTrue(body.contains("isAdult: false"))
+        assertTrue(!body.contains("airingSchedules("))
+    }
+
     private lateinit var server: MockWebServer
     private lateinit var client: AniListClient
 
@@ -55,23 +89,15 @@ class AniListClientTest {
     }
 
     @Test
-    fun `popular this season is scoped to the season and upcoming rides the same request`() = runBlocking {
-        server.enqueue(
-            graphQlBody(
-                """{"data":{"popular":{"media":[{"id":1,"isAdult":false}]},
-                    "upcoming":{"media":[{"id":2,"isAdult":false}]}}}""",
-            ),
-        )
-
-        val rows = client.homeCollections(AiringSeason("FALL", 2026))
-
-        assertEquals(listOf(1), rows.popular.map { it.id })
-        assertEquals(listOf(2), rows.upcoming.map { it.id })
+    fun `popular row stays seasonal without fetching upcoming`() = runBlocking {
+        server.enqueue(graphQlBody("""{"data":{"Page":{"media":[{"id":1}]}}}"""))
+        val rows = client.collection("POPULARITY_DESC", season = AiringSeason("FALL", 2026))
+        assertEquals(listOf(1), rows.items.map { it.id })
         assertEquals(1, server.requestCount)
         val body = server.takeRequest().body.readUtf8()
-        assertTrue(body.contains("\"season\":\"FALL\""))
-        assertTrue(body.contains("\"seasonYear\":2026"))
-        assertTrue(body.contains("status: NOT_YET_RELEASED"))
+        assertTrue(body.contains("season: FALL"))
+        assertTrue(body.contains("seasonYear: 2026"))
+        assertTrue(!body.contains("NOT_YET_RELEASED"))
     }
 
     @Test

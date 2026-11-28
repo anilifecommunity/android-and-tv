@@ -11,6 +11,8 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.anilili.data.AppGraph
+import com.anilili.data.device.hasConservativeMemoryBudget
+import com.anilili.data.device.imageMemoryCacheBytes
 import com.anilili.data.auth.AuthManager
 import com.anilili.data.auth.MalAuthManager
 import com.anilili.diagnostics.CrashReporter
@@ -198,7 +200,7 @@ class MiruroApp : Application(), ImageLoaderFactory {
         .okHttpClient { AppGraph.httpClient.newBuilder().cache(null).build() }
         .memoryCache {
             MemoryCache.Builder(this)
-                .maxSizePercent(if (AppGraph.isTv) 0.12 else 0.25)
+                .maxSizeBytes(imageMemoryCacheBytes(Runtime.getRuntime().maxMemory(), AppGraph.isTv, hasConservativeMemoryBudget(this)))
                 .build()
         }
         .diskCache {

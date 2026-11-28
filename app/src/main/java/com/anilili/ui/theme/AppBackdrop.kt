@@ -1,7 +1,7 @@
 package com.anilili.ui.theme
 
-import android.app.ActivityManager
 import android.content.Context
+import com.anilili.data.device.hasConservativeMemoryBudget
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -232,7 +232,7 @@ internal suspend fun renderAppBackdrop(
     dim: Float,
     blur: Boolean,
 ): ImageBitmap? {
-    val lowRam = (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
+    val lowRam = hasConservativeMemoryBudget(context)
     val longSide = maxOf(window.width, window.height).toFloat()
     val scale = when {
         blur -> if (lowRam) 1f / 3 else 0.5f

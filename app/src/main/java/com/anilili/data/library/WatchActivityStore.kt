@@ -51,7 +51,7 @@ object WatchActivityStore {
 
 /** A late callback or a newly discovered next episode must not count the same completion again. */
 internal fun shouldRecordWatchActivity(existing: HistoryEntry, watchedEpisode: Double): Boolean =
-    existing.episodeNumber == watchedEpisode && watchedEpisode !in existing.watchedEpisodes
+    existing.episodeNumber == watchedEpisode && !existing.isEpisodeWatched(watchedEpisode)
 
 /**
  * This device's episodes and the account's own activity, one count per day. A day counted in both

@@ -45,9 +45,19 @@ class NextSeasonTest {
     }
 
     @Test
-    fun `a film does not move on to the season that aired after it`() {
+    fun `a verified continuation film can advance through the same franchise order`() {
         val film = Media(id = 9, format = "MOVIE", status = "FINISHED")
-        assertNull(nextSeasonAfter(film, listOf(season1, film, season2)))
+        assertEquals(season2.id, nextSeasonAfter(film, listOf(season1, film, season2))?.id)
+    }
+
+    @Test
+    fun `both final specials advance by their own media ids without skipping an unknown entry`() {
+        val first = Media(id = 146984, format = "SPECIAL", status = "FINISHED", episodes = 1)
+        val second = Media(id = 162314, format = "SPECIAL", status = "FINISHED", episodes = 1)
+        assertEquals(first.id, nextSeasonAfter(season1, listOf(season1, first, second))?.id)
+        assertEquals(second.id, nextSeasonAfter(first, listOf(season1, first, second))?.id)
+        assertNull(nextSeasonAfter(first, listOf(first, second.copy(status = null))))
+        assertNull(nextSeasonAfter(first, listOf(first, second.copy(format = "MUSIC"))))
     }
 
     @Test
