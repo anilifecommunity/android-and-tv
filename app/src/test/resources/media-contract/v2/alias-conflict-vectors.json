@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "2.0.0",
+  "description": "Existing legacy map collision IDs, expressed as competing input verification claims; neither claim proves a unique MAL join.",
+  "refs": [
+    {"kind": "ANIME", "mediaKey": "al-17295", "format": "TV", "aliases": [
+      {"namespace": "anilist:anime", "id": 17295, "verified": true, "provenance": {"source": "contract-fixture"}},
+      {"namespace": "mal:anime", "id": 17295, "verified": true, "provenance": {"source": "legacy-map-claim"}}
+    ]},
+    {"kind": "ANIME", "mediaKey": "al-206843", "format": "TV", "aliases": [
+      {"namespace": "anilist:anime", "id": 206843, "verified": true, "provenance": {"source": "contract-fixture"}},
+      {"namespace": "mal:anime", "id": 17295, "verified": true, "provenance": {"source": "legacy-map-claim"}}
+    ]}
+  ],
+  "priorBinding": {
+    "alias": {"namespace": "mal:anime", "id": 17295, "verified": true, "provenance": {"source": "prior-contract-fixture"}},
+    "target": {"kind": "ANIME", "mediaKey": "al-17295"}
+  },
+  "expected": {
+    "namespace": "mal:anime", "id": 17295, "reason": "ambiguous",
+    "candidates": [{"kind": "ANIME", "mediaKey": "al-17295"}, {"kind": "ANIME", "mediaKey": "al-206843"}],
+    "verifiedAfterReconciliation": false,
+    "primaryMediaKeysAfterReconciliation": ["al-17295", "al-206843"]
+  }
+}

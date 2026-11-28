@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "2.0.0",
+  "canonical": [
+    {"kind":"ANIME","namespace":"anilist:anime","id":42,"format":"MOVIE","mediaKey":"al-42"},
+    {"kind":"MANGA","namespace":"anilist:manga","id":42,"format":"MANGA","mediaKey":"al-42"},
+    {"kind":"NOVEL","namespace":"anilist:manga","id":30001,"format":"NOVEL","mediaKey":"al-30001"},
+    {"kind":"MOVIE","namespace":"tmdb:movie","id":42,"format":"MOVIE","mediaKey":"tmdb-movie-42"},
+    {"kind":"TV","namespace":"tmdb:tv","id":42,"format":"TV","mediaKey":"tmdb-tv-42"}
+  ],
+  "source": [
+    {"parts":["mihon","official","reader","COMIC","series-42"],"mediaKey":"src-e4748cccdb945f55561da9ac4fd7fe5a75bbff3fa6937205020d403b0512dd8f"},
+    {"parts":["lnreader","official","novels","NOVEL","作品/42"],"mediaKey":"src-c7d3b78642e47098023b8a7233eee8c16cbd2096666564af033d97be703a974c"},
+    {"parts":["stremio","official","video","MOVIE","42"],"mediaKey":"src-6ad890c0e78d70c5803d1f7503718943095fa08c61ad3fe6e2b47207c561fa5d"},
+    {"parts":["stremio","official","video","TV","42"],"mediaKey":"src-cf1f7c6517d56194b61689ff7977ac1175fbf8d830116ac05d0b3317da4fcba5"}
+  ],
+  "legacyNovelProjection": {
+    "from":{"kind":"MANGA","mediaKey":"al-30001"},
+    "to":{"kind":"NOVEL","mediaKey":"al-30001"},
+    "evidence":{"namespace":"anilist:manga","id":30001,"format":"NOVEL"}
+  }
+}
